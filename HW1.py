@@ -135,6 +135,124 @@ if __name__ == "__main__":
     run_bisection_tests()
 
 
+def golden_section_algorithm(a, b, ε, max_iteration=100):
+    # Before the first iteration, we should determine x, y and their values
+    γ = (math.sqrt(5) - 1) / 2
+    x = b - (γ * (b - a))
+    y = a + (γ * (b - a))
+    fx = f(x)
+    fy = f(y)
+    
+    # Each iteration will create a dictionary in the list, which contains necessary information for outputs
+    results = []
+    results.append({
+        "k": 0,
+        "a": a,
+        'b': b,
+        'x': x,
+        'y': y,
+        'fx': fx,
+        'fy': fy,
+        'ratio': None,
+        'log_ratio': None})
+    
+    x_previous = x
+    k = 1
+
+    # This block is about how the iterations are made
+    while (b - a) >= ε and k < max_iteration:
+        if fx < fy:
+            b = y
+            y = x
+            fy = fx
+            x = b - ((γ) * (b - a))
+            fx = f(x)
+        else:
+            a = x
+            x = y
+            fx = fy
+            y = a + ((γ) * (b - a))
+            fy = f(y)
+
+        # Calculating how fast it converges (pace of the convergence)
+        if fx<fy:
+            x_k = x 
+        else:
+            x_k = y
+
+        if k > 1:
+            ratio, log_ratio = calculate_ratios(current_x=x_k,prev_x=x_previous,prev2_x=x_2previous,order=1)
+        else:
+            ratio, log_ratio = "N/A", "N/A"
+
+        # Necessary information for the iteration is added to the list as a dictionary    
+        results.append({
+            'k': k,
+            'a': a,
+            'b': b,
+            'x': x,
+            'y': y,
+            'fx': fx,
+            'fy': fy,
+            'ratio': ratio,
+            'log_ratio': log_ratio})
+
+        x_2previous = x_previous
+        x_previous = x_k
+        k = k + 1
+
+    # Optimal points at the end
+    if fx < fy:
+        x_star = x
+        f_star = fx
+    else:
+        x_star = y
+        f_star = fy
+    return x_star, f_star, results
+
+
+# Printing the information related to each iteration
+def showing_results(results, x_star, f_star, a, b, ε):
+    print("\n" + "-"*120)
+    print(f"Golden Section Algorithm - Parameters: a={a}, b={b}, ε={ε}")
+    print("-"*120)
+    print(f"{'Iteration':<10} {'a':<14} {'b':<14} {'x':<14} {'y':<14} {'f(x)':<14} {'f(y)':<14} {'Ratio':<12} {'Log Ratio':<12}")
+    print("-"*120)
+    
+    for i in results:
+        if i["ratio"] is not None and isinstance(i["ratio"], (int, float)):
+            ratio_str = f"{i['ratio']:.6f}"
+        else:
+            ratio_str = "---"
+
+        if i['log_ratio'] is not None and isinstance(i["log_ratio"], (int, float)):
+            log_ratio_str = f"{i['log_ratio']:.6f}"
+        else:
+            log_ratio_str = "---"
+        
+        print(f"{i['k']:<10} {i['a']:<14.8f} {i['b']:<14.8f} {i['x']:<14.8f} {i['y']:<14.8f} "
+              f"{i['fx']:<14.8f} {i['fy']:<14.8f} {ratio_str:<12} {log_ratio_str:<12}")
+    
+    print("-"*120)
+    print(f"x* = {x_star:.10f}")
+    print(f"f(x*) = {f_star:.10f}")
+    print("="*120 + "\n")
+
+
+# Common Interval 1
+print("*****" + " "*20 + "Common Interval 1" + " "*20 + "*****")
+x_star, f_star, results= golden_section_algorithm(-10,10,1e-4,100)
+showing_results(results, x_star,f_star,-10,10,1e-4)
+
+# Common Interval 2
+print("*****" + " "*20 + "Common Interval 2" + " "*20 + "*****")
+x_star, f_star, results= golden_section_algorithm(5, 6, 1e-6,100)
+showing_results(results, x_star,f_star,5, 6, 1e-6)
+
+# Common Interval 3
+print("*****" + " "*20 + "Common Interval 3" + " "*20 + "*****")
+x_star, f_star, results= golden_section_algorithm(-6, -5, 1e-3,100)
+showing_results(results, x_star,f_star,-6, -5, 1e-3)
 
 
 
