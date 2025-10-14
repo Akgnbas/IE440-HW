@@ -112,7 +112,7 @@ def bisection_method(obj_func, a_init, b_init, epsilon, run_id):
     print(f"f(x*) = {final_fx:.8f}")
     print("========================================================\n")
     
-    return final_x, final_fx  # Return result for plotting
+    return final_x, final_fx  
 
 # Tests
 def run_bisection_tests():
