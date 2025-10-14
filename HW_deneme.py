@@ -57,52 +57,62 @@ def bisection_method(obj_func, a_init, b_init, epsilon, run_id):
     print(f"\n--- Bisection Method Run {run_id} (e={epsilon}, a={a_init}, b={b_init}) ---")
     a, b = a_init, b_init
 
-    # Bisection requires f'(a) and f'(b) to have opposite signs
-    if f_prime(a) * f_prime(b) > 0:
-        print(f"Error: f'({a})={f_prime(a):.2e} and f'({b})={f_prime(b):.2e}. f'(a) * f'(b) > 0. Root not guaranteed.")
-        return  # Exit the function if condition is not met
+    # Check if interval is valid
+    if a >= b:
+        print(f"Error: Invalid interval a={a}, b={b}. Must have a < b.")
+        return
 
     # Columns: Iteration, a, b, T (x_k), f(T), Ratio R, Log L
     print(f"{'Iter':<5}{'a':<12}{'b':<12}{'T (x_k)':<12}{'f(T)':<15}{'Ratio R (p=1)':<12}{'Log L':<10}")
     print("-" * 76)
-
+    
     x_prev = None
     x_prev2 = None
     iteration = 0
+    CONVERGENCE_ORDER = 1  # Convergence order for Bisection is p=1
 
-    # Convergence order for Bisection is p=1
-    CONVERGENCE_ORDER = 1
-
-    while abs(b - a) / 2 > epsilon:
+    while abs(b - a) > epsilon:
         T = (a + b) / 2
-        fT = f(T)
-        f_prime_T = f_prime(T)
+        fT = obj_func(T)
+        delta = (b - a) / 1000  # Small step for numerical slope estimation
+        x_right = T + delta
+        f_right = obj_func(x_right)
 
+        # If f(x_right) > f(T), the function is increasing, so minimum is likely to the left
+        if f_right > fT:
+            b = T  # Narrow interval to [a, T]
+        else:
+            a = T  # Narrow interval to [T, b]
+
+        # Calculate convergence ratios
         ratio_R, log_diff_L = calculate_ratios(T, x_prev, x_prev2, order=CONVERGENCE_ORDER)
 
-        # Print iteration results in the specified format
+        # Print iteration results
         print(
             f"{iteration:<5}{a:<12.6f}{b:<12.6f}{T:<12.6f}{fT:<15.6f}"
-            f"{str(ratio_R):<12}{str(log_diff_L):<10}"
+            f"{(f'{ratio_R:.6f}' if isinstance(ratio_R, (int, float)) else 'N/A'):<12}"
+            f"{(f'{log_diff_L:.6f}' if isinstance(log_diff_L, (int, float)) else 'N/A'):<10}"
         )
-
-        if f_prime(a) * f_prime(T) > 0:
-            a = T
-        else:
-            b = T
 
         x_prev2 = x_prev
         x_prev = T
         iteration += 1
 
+        # Prevent infinite loops
+        if iteration > 1000:
+            print("Warning: Maximum iterations reached.")
+            break
+
     final_x = (a + b) / 2
-    final_fx = f(final_x)
+    final_fx = obj_func(final_x)
 
     print("-" * 76)
     print(f"Solution for Bisection Method:")
-    print(f"x*={final_x:.8f}")
-    print(f"f(x*)={final_fx:.8f}")
+    print(f"x* = {final_x:.8f}")
+    print(f"f(x*) = {final_fx:.8f}")
     print("========================================================\n")
+    
+    return final_x, final_fx  # Return result for plotting
 
 # Tests
 def run_bisection_tests():
