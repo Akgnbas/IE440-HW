@@ -164,27 +164,26 @@ def solve_part3(n, m, customer_coords, transport_costs):
     """
     print(f"Running ALA Heuristic for {N_TRIALS} trials...")
     
-    #Store the final cost of each trial
+    # Store the final cost of each trial
     all_trial_costs = []
     
-    #Store best results
+    # --- NEW: Store best results ---
     best_cost = np.inf
     best_locations = np.zeros((m, 2))
     best_assignments = np.zeros(n, dtype=int)
-    #Ensuring reproducibility by giving seed
-    np.random.seed(1923)
-    #Outer loop for 1000 trials
+    # -------------------------------
+    
+    # 3.3: Outer loop for 1000 trials
     for trial in range(N_TRIALS):
         
-        #Randomly allocate customers to facilities
-        
+        # --- 3.1: Randomly allocate customers to facilities ---
         assignments = np.random.randint(0, m, size=n)
         facility_locations = np.zeros((m, 2))
         
-        #Inner loop for ALA operations
+        # Inner loop for ALA convergence
         for ala_iter in range(MAX_ALA_ITERATIONS):
             
-            #Location Step
+            # --- A: Location Step ---
             new_locations = np.zeros((m, 2))
             for i in range(m):
                 customer_indices = np.where(assignments == i)[0]
@@ -205,7 +204,7 @@ def solve_part3(n, m, customer_coords, transport_costs):
             
             facility_locations = new_locations
             
-            #Allocation Step
+            # --- B: Allocation Step ---
             new_assignments = np.zeros(n, dtype=int)
             for j in range(n):
                 customer_loc = customer_coords[j]
@@ -217,13 +216,15 @@ def solve_part3(n, m, customer_coords, transport_costs):
                     
                 new_assignments[j] = np.argmin(costs_to_all_facilities)
 
-            #stop ALA
+            # --- C: Check Convergence ---
             if np.all(assignments == new_assignments):
                 break
             
             assignments = new_assignments
+            
+        # --- End of inner ALA loop ---
         
-        #Calculating the final total cost for this trial
+        # Calculate the final total cost for this converged trial
         trial_total_cost = 0.0
         for j in range(n):
             i = assignments[j]
@@ -233,26 +234,28 @@ def solve_part3(n, m, customer_coords, transport_costs):
             
         all_trial_costs.append(trial_total_cost)
         
-        #Checking if this is the best result so far
+        # --- NEW: Check if this is the best result so far ---
         if trial_total_cost < best_cost:
             best_cost = trial_total_cost
             best_locations = np.copy(facility_locations)
             best_assignments = np.copy(assignments)
+        # ----------------------------------------------------
 
-        # Simple progress shown
+        # Simple progress bar
         if (trial + 1) % 100 == 0:
             print(f"  Completed trial {trial + 1}/{N_TRIALS}")
 
-    #End of 1000 trials
+    # --- End of 1000 trials ---
     
-    #Reportin the average and best results
+    # 3.3: Report the average and best results
+    # best_cost = np.min(all_trial_costs) # <--- We already have this
     avg_cost = np.mean(all_trial_costs)
     
     print("\n--- ALA Heuristic Results (Part 3) ---")
     print(f"Best (Minimum) Cost found: {best_cost:,.2f}")
     print(f"Average Cost over {N_TRIALS} trials: {avg_cost:,.2f}")
     
-    #Printing the best results
+    # --- NEW: Print the best results ---
     print("\n--- Details for Best Result ---")
     print("Optimal Facility Locations (x1, x2):")
     for i in range(m):
@@ -261,11 +264,169 @@ def solve_part3(n, m, customer_coords, transport_costs):
     print("\nCustomer Assignments (Customer -> Facility):")
     for j in range(n):
         print(f"  Customer {j + 1} -> Facility {best_assignments[j] + 1}")
+    # -------------------------------------
 
     return best_cost, avg_cost
 
             
+# Q4
 
+def pure_euclidian_distance(p, q):
+    # Euclidian distance to find actual distance without any epsilon
+    return math.sqrt(np.sum((p - q) ** 2))
+
+def weiszfeld(a_coords, weights, x0, tol=weizfeld_tolerance, eps=epsilon, max_it=weizfeld_max_iter):
+    # This function is intended to perform weiszfeld algorithm for only one facility.
+    # I thought that it would ease my work for the main part of the function called "solve_part4".
+    # Let me introduce the parameters first.
+    # a_coords = coordinates of customers assigned to facility
+    # weights = C_ij = h_j * c_ij
+    # x0 = starting point of facility
+    # tol = for convergence, eps = for checking 1 / 0 conditions, max_it = maximum iteration
+
+    x = np.array(x0, dtype=float)
+    for _ in range(max_it):
+        d = np.linalg.norm(a_coords - x, axis=1) # vector gives the distance values of facility i to customer j's
+
+        # If a facility is closer to a customer than tol, take the facility to the customer's location
+        near = np.where(d < tol)[0]
+        if near.size > 0 and np.any(weights[near] > 0):
+            x_new = a_coords[near[0]]
+            if pure_euclidian_distance(x_new, x) < tol:
+                return x_new
+            x = x_new
+            continue
+
+        # 1 / d (x,dj) in the formula. To avoid 1/0, I take 1/max(d,eps)
+        invd = 1.0 / np.maximum(d, eps)
+
+        # Sum of [Cij*customer coordinates* 1/d]
+        num = (weights[:, None] * a_coords * invd[:, None]).sum(axis=0)
+        # Sum of [Cij*1/d]
+        den = (weights * invd).sum()
+
+        # New location of facility
+        x_new = a_coords.mean(axis=0) if den <= 0 else num / den
+
+        # if the location change is lower than tol, it is enough
+        if pure_euclidian_distance(x_new, x) < tol:
+            return x_new
+        x = x_new
+
+        # If it reaches max iteration
+    return x  
+
+def total_cost(x_fac, assignments, customer_coords, transport_costs):
+    # x_fac = coordinates of facilities
+    # assignments = which customer assigned to which facility. It is a vector
+    # This function is intended for calculating the total cost.
+    # It spans over customers for each facility.
+    # sum_j C_{i_j, j} * ||x_{i_j} - a_j|| ]
+
+    total = 0.0
+    for j in range(customer_coords.shape[0]):
+        i = assignments[j]
+        total += transport_costs[i, j] * pure_euclidian_distance(x_fac[i], customer_coords[j])
+    return total
+
+def assigning_customers(customer_coords, x_fac, transport_costs):
+    # This function is intended for assigning customers to nearest weighted facilities.
+    # For each customer j, i = argmin_i (C_ij * ||x_i - a_j||)
+    n, m = customer_coords.shape[0], x_fac.shape[0]
+    assignments = np.zeros(n, dtype=int)
+    for j in range(n):
+        vals = np.empty(m)
+        for i in range(m):
+            vals[i] = transport_costs[i, j] * pure_euclidian_distance(x_fac[i], customer_coords[j])
+        assignments[j] = int(np.argmin(vals))
+    return assignments
+
+def solve_part4(n, m, customer_coords, transport_costs, restarts=1000, max_outer=100, seed=123):
+    rng = np.random.default_rng(seed)
+    best_cost = float('inf')
+    best_locations = None
+    best_assignments = None
+    best_iters = None
+    best_restart = None
+    all_costs= []
+
+    for r in range(restarts):
+        # random assigning as a starting point
+        assignments = rng.integers(low=0, high=m, size=n)
+
+        # starting facilities locations
+        x_fac = np.zeros((m, 2))
+        for i in range(m):
+            idx = np.where(assignments == i)[0] # gives the indexes of customers assigned to ith facility
+            if idx.size > 0:
+                # take a random index from assigned customers
+                # and set the location of a facility there to start from a closer area.
+                x_fac[i] = customer_coords[idx[rng.integers(0, idx.size)]] 
+            else:
+                # if there is no assigned customer to that facility, locate it randomly
+                x_fac[i] = customer_coords[rng.integers(0, n)] 
+
+        prev_obj = float('inf')
+        for t in range(1, max_outer + 1):
+            # This is intended for weiszfeld algorithm for each facility.
+            for i in range(m):
+                idx = np.where(assignments == i)[0]
+                if idx.size == 0:
+                    # facility having no assigned customer, we locate it to a random customers location
+                    x_fac[i] = customer_coords[rng.integers(0, n)]
+                    continue
+                a_i = customer_coords[idx]
+                w_i = transport_costs[i, idx]
+                x_fac[i] = weiszfeld(a_i, w_i, x_fac[i])
+
+            # After weiszfeld algorithm, calculation of total cost
+            cur_obj = total_cost(x_fac, assignments, customer_coords, transport_costs)
+
+            # Assigning the customers to the nearest weighted facilities
+            new_assignments = assigning_customers(customer_coords, x_fac, transport_costs)
+
+            # If there is no improvement and assigned customers are the same
+            if prev_obj - cur_obj <= 1e-8:
+                break
+
+            assignments = new_assignments
+            prev_obj = cur_obj
+
+        # For each restart, we calculate the final obj.
+        final_obj = total_cost(x_fac, assignments, customer_coords, transport_costs)
+        all_costs.append(final_obj)
+
+        # If this restart's result is better than others, we take it
+        if final_obj < best_cost:
+            best_cost = final_obj
+            best_locations = x_fac.copy()
+            best_assignments = assignments.copy()
+            best_iters = t
+            best_restart = r
+
+        # To see how many trial is completed
+        if (r + 1) % 100 == 0:
+            print(f"  Completed {r+1}/{restarts} restarts")
+
+    avg_cost = float(np.mean(all_costs))
+
+
+    print("\n=== RESULTS ===")
+    print(f"Average objective over {restarts} restarts: {avg_cost:.6f}")
+    print(f"Best objective: {best_cost:.6f}")
+    # it shows how many ALA iteration is done in the best restart case giving the best case
+    # print(f"Outer iterations (best run): {best_iters}") 
+    # it shows at which restart, the best cost is achieved
+    # print(f"Restart index (best run): {best_restart}")
+    # Since they are not asked, I dont include them
+    print("\nFacility locations (x1, x2):")
+    for i, (x1, x2) in enumerate(best_locations, start=1):
+        print(f"  Facility {i}: ({x1:.4f}, {x2:.4f})")
+    print("\nCustomer assignments (customer -> facility):")
+    for j, i in enumerate(best_assignments, start=1):
+        print(f"Customer {j} -> Facility {i+1}")
+
+    return best_cost, best_locations, best_assignments, avg_cost
 
     
     
@@ -278,7 +439,7 @@ if __name__ == "__main__":
         n, m, customer_coords, demand, unit_costs, transport_costs = load_data()
         
         # Part 1 
-        print("\n=== Q 1: Single Facility (Squared Euclidean) ===")
+        print("\n=== PART 1: Single Facility (Squared Euclidean) ===")
         # We chose Facility 1 (index 0)
         FACILITY_TO_TEST = 0
         part1_location, part1_cost = solve_part1(FACILITY_TO_TEST, customer_coords, transport_costs)
@@ -292,6 +453,9 @@ if __name__ == "__main__":
         print("\n=== PART 3: Multi-Facility (ALA Heuristic) ===")
         solve_part3(n, m, customer_coords, transport_costs)
         
+        # Part 4
+        print("\n=== PART 4: Multi-Facility (ALA + Weiszfeld, Euclidean) ===")
+        solve_part4(n, m, customer_coords, transport_costs)
 
 
 
