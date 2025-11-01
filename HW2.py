@@ -164,26 +164,27 @@ def solve_part3(n, m, customer_coords, transport_costs):
     """
     print(f"Running ALA Heuristic for {N_TRIALS} trials...")
     
-    # Store the final cost of each trial
+    #Store the final cost of each trial
     all_trial_costs = []
     
-    # --- NEW: Store best results ---
+    #Store best results
     best_cost = np.inf
     best_locations = np.zeros((m, 2))
     best_assignments = np.zeros(n, dtype=int)
-    # -------------------------------
-    
-    # 3.3: Outer loop for 1000 trials
+    #Ensuring reproducibility by giving seed
+    np.random.seed(1923)
+    #Outer loop for 1000 trials
     for trial in range(N_TRIALS):
         
-        # --- 3.1: Randomly allocate customers to facilities ---
+        #Randomly allocate customers to facilities
+        
         assignments = np.random.randint(0, m, size=n)
         facility_locations = np.zeros((m, 2))
         
-        # Inner loop for ALA convergence
+        #Inner loop for ALA operations
         for ala_iter in range(MAX_ALA_ITERATIONS):
             
-            # --- A: Location Step ---
+            #Location Step
             new_locations = np.zeros((m, 2))
             for i in range(m):
                 customer_indices = np.where(assignments == i)[0]
@@ -204,7 +205,7 @@ def solve_part3(n, m, customer_coords, transport_costs):
             
             facility_locations = new_locations
             
-            # --- B: Allocation Step ---
+            #Allocation Step
             new_assignments = np.zeros(n, dtype=int)
             for j in range(n):
                 customer_loc = customer_coords[j]
@@ -216,15 +217,13 @@ def solve_part3(n, m, customer_coords, transport_costs):
                     
                 new_assignments[j] = np.argmin(costs_to_all_facilities)
 
-            # --- C: Check Convergence ---
+            #stop ALA
             if np.all(assignments == new_assignments):
                 break
             
             assignments = new_assignments
-            
-        # --- End of inner ALA loop ---
         
-        # Calculate the final total cost for this converged trial
+        #Calculating the final total cost for this trial
         trial_total_cost = 0.0
         for j in range(n):
             i = assignments[j]
@@ -234,28 +233,26 @@ def solve_part3(n, m, customer_coords, transport_costs):
             
         all_trial_costs.append(trial_total_cost)
         
-        # --- NEW: Check if this is the best result so far ---
+        #Checking if this is the best result so far
         if trial_total_cost < best_cost:
             best_cost = trial_total_cost
             best_locations = np.copy(facility_locations)
             best_assignments = np.copy(assignments)
-        # ----------------------------------------------------
 
-        # Simple progress bar
+        # Simple progress shown
         if (trial + 1) % 100 == 0:
             print(f"  Completed trial {trial + 1}/{N_TRIALS}")
 
-    # --- End of 1000 trials ---
+    #End of 1000 trials
     
-    # 3.3: Report the average and best results
-    # best_cost = np.min(all_trial_costs) # <--- We already have this
+    #Reportin the average and best results
     avg_cost = np.mean(all_trial_costs)
     
     print("\n--- ALA Heuristic Results (Part 3) ---")
     print(f"Best (Minimum) Cost found: {best_cost:,.2f}")
     print(f"Average Cost over {N_TRIALS} trials: {avg_cost:,.2f}")
     
-    # --- NEW: Print the best results ---
+    #Printing the best results
     print("\n--- Details for Best Result ---")
     print("Optimal Facility Locations (x1, x2):")
     for i in range(m):
@@ -264,7 +261,6 @@ def solve_part3(n, m, customer_coords, transport_costs):
     print("\nCustomer Assignments (Customer -> Facility):")
     for j in range(n):
         print(f"  Customer {j + 1} -> Facility {best_assignments[j] + 1}")
-    # -------------------------------------
 
     return best_cost, avg_cost
 
