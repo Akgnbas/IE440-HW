@@ -1,6 +1,7 @@
 import csv 
 import numpy as np
 import math
+import sys
 
 
 coordinates="coordinates_10.csv"
@@ -11,6 +12,8 @@ epsilon=1e-8
 weizfeld_max_iter=1000
 weizfeld_tolerance=1e-6
 
+N_TRIALS = 1000
+MAX_ALA_ITERATIONS = 100 # Max iterations for the inner ALA loop
 
 def load_data():
 
@@ -42,7 +45,8 @@ def load_data():
 
 
     # Calculate total transport cost C_ij = h_j * c_ij
-    transport_costs = unit_costs * demand
+    transport_costs = unit_costs * demand[np.newaxis, :]
+    #small error corrected here above
 
     print(f"Number of customers (n): {n}")
     print(f"Number of facilities (m): {m}")
@@ -153,7 +157,116 @@ def solve_part2(facility_index, customer_coords, transport_costs, initial_locati
     
     return current_location, total_cost
 
+def solve_part3(n, m, customer_coords, transport_costs):
+    """
+    Solves the Multi-Facility Problem using the
+    Alternative Location-Allocation (ALA) Heuristic.
+    """
+    print(f"Running ALA Heuristic for {N_TRIALS} trials...")
+    
+    # Store the final cost of each trial
+    all_trial_costs = []
+    
+    # --- NEW: Store best results ---
+    best_cost = np.inf
+    best_locations = np.zeros((m, 2))
+    best_assignments = np.zeros(n, dtype=int)
+    # -------------------------------
+    
+    # 3.3: Outer loop for 1000 trials
+    for trial in range(N_TRIALS):
+        
+        # --- 3.1: Randomly allocate customers to facilities ---
+        assignments = np.random.randint(0, m, size=n)
+        facility_locations = np.zeros((m, 2))
+        
+        # Inner loop for ALA convergence
+        for ala_iter in range(MAX_ALA_ITERATIONS):
+            
+            # --- A: Location Step ---
+            new_locations = np.zeros((m, 2))
+            for i in range(m):
+                customer_indices = np.where(assignments == i)[0]
+                
+                if len(customer_indices) > 0:
+                    assigned_coords = customer_coords[customer_indices]
+                    C_j_weights = transport_costs[i, customer_indices]
+                    sum_C_j = np.sum(C_j_weights)
+                    weighted_coords_sum = np.dot(C_j_weights, assigned_coords)
+                    
+                    if sum_C_j > 0:
+                        new_locations[i] = weighted_coords_sum / sum_C_j
+                    else:
+                        new_locations[i] = np.mean(assigned_coords, axis=0)
+                else:
+                    rand_customer_idx = np.random.randint(0, n)
+                    new_locations[i] = customer_coords[rand_customer_idx]
+            
+            facility_locations = new_locations
+            
+            # --- B: Allocation Step ---
+            new_assignments = np.zeros(n, dtype=int)
+            for j in range(n):
+                customer_loc = customer_coords[j]
+                costs_to_all_facilities = np.zeros(m)
+                for i in range(m):
+                    C_ij = transport_costs[i, j]
+                    dist_sq = squared_euclidean_distance(facility_locations[i], customer_loc)
+                    costs_to_all_facilities[i] = C_ij * dist_sq
+                    
+                new_assignments[j] = np.argmin(costs_to_all_facilities)
 
+            # --- C: Check Convergence ---
+            if np.all(assignments == new_assignments):
+                break
+            
+            assignments = new_assignments
+            
+        # --- End of inner ALA loop ---
+        
+        # Calculate the final total cost for this converged trial
+        trial_total_cost = 0.0
+        for j in range(n):
+            i = assignments[j]
+            C_ij = transport_costs[i, j]
+            dist_sq = squared_euclidean_distance(facility_locations[i], customer_coords[j])
+            trial_total_cost += C_ij * dist_sq
+            
+        all_trial_costs.append(trial_total_cost)
+        
+        # --- NEW: Check if this is the best result so far ---
+        if trial_total_cost < best_cost:
+            best_cost = trial_total_cost
+            best_locations = np.copy(facility_locations)
+            best_assignments = np.copy(assignments)
+        # ----------------------------------------------------
+
+        # Simple progress bar
+        if (trial + 1) % 100 == 0:
+            print(f"  Completed trial {trial + 1}/{N_TRIALS}")
+
+    # --- End of 1000 trials ---
+    
+    # 3.3: Report the average and best results
+    # best_cost = np.min(all_trial_costs) # <--- We already have this
+    avg_cost = np.mean(all_trial_costs)
+    
+    print("\n--- ALA Heuristic Results (Part 3) ---")
+    print(f"Best (Minimum) Cost found: {best_cost:,.2f}")
+    print(f"Average Cost over {N_TRIALS} trials: {avg_cost:,.2f}")
+    
+    # --- NEW: Print the best results ---
+    print("\n--- Details for Best Result ---")
+    print("Optimal Facility Locations (x1, x2):")
+    for i in range(m):
+        print(f"  Facility {i + 1}: ({best_locations[i, 0]:.2f}, {best_locations[i, 1]:.2f})")
+        
+    print("\nCustomer Assignments (Customer -> Facility):")
+    for j in range(n):
+        print(f"  Customer {j + 1} -> Facility {best_assignments[j] + 1}")
+    # -------------------------------------
+
+    return best_cost, avg_cost
 
             
 
@@ -178,6 +291,10 @@ if __name__ == "__main__":
         print("\n=== PART 2: Single Facility (Euclidean - Weiszfeld) ===")
         # Use the result from Part 1 as the initial location
         solve_part2(FACILITY_TO_TEST, customer_coords, transport_costs, part1_location)
+        
+        # Part 3
+        print("\n=== PART 3: Multi-Facility (ALA Heuristic) ===")
+        solve_part3(n, m, customer_coords, transport_costs)
         
 
 
