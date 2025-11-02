@@ -444,20 +444,20 @@ if __name__ == "__main__":
         # Load all data
         n, m, customer_coords, demand, unit_costs, transport_costs = load_data()
         
-        # # Part 1 
-        # print("\n=== PART 1: Single Facility (Squared Euclidean) ===")
-        # # We chose Facility 1 (index 0)
-        # FACILITY_TO_TEST = 0
-        # part1_location, part1_cost = solve_part1(FACILITY_TO_TEST, customer_coords, transport_costs)
+        # Part 1 
+        print("\n=== PART 1: Single Facility (Squared Euclidean) ===")
+        # We chose Facility 1 (index 0)
+        FACILITY_TO_TEST = 0
+        part1_location, part1_cost = solve_part1(FACILITY_TO_TEST, customer_coords, transport_costs)
     
-        # # Part 2 
-        # print("\n=== PART 2: Single Facility (Euclidean - Weiszfeld) ===")
-        # # Use the result from Part 1 as the initial location
-        # solve_part2(FACILITY_TO_TEST, customer_coords, transport_costs, part1_location)
+        # Part 2 
+        print("\n=== PART 2: Single Facility (Euclidean - Weiszfeld) ===")
+        # Use the result from Part 1 as the initial location
+        solve_part2(FACILITY_TO_TEST, customer_coords, transport_costs, part1_location)
         
-        # # Part 3
-        # print("\n=== PART 3: Multi-Facility (ALA Heuristic) ===")
-        # solve_part3(n, m, customer_coords, transport_costs)
+        # Part 3
+        print("\n=== PART 3: Multi-Facility (ALA Heuristic) ===")
+        solve_part3(n, m, customer_coords, transport_costs)
         
         # Part 4
         print("\n=== PART 4: Multi-Facility (ALA + Weiszfeld, Euclidean) ===")
