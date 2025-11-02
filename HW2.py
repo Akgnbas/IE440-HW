@@ -275,7 +275,7 @@ def pure_euclidian_distance(p, q):
     # Euclidian distance to find actual distance without any epsilon
     return math.sqrt(np.sum((p - q) ** 2))
 
-def weiszfeld(a_coords, weights, x0, tol=weizfeld_tolerance, eps=epsilon, max_it=weizfeld_max_iter):
+def weiszfeld(a_coords, weights, x0=None, tol=weizfeld_tolerance, eps=epsilon, max_it=weizfeld_max_iter):
     # This function is intended to perform weiszfeld algorithm for only one facility.
     # I thought that it would ease my work for the main part of the function called "solve_part4".
     # Let me introduce the parameters first.
@@ -284,7 +284,16 @@ def weiszfeld(a_coords, weights, x0, tol=weizfeld_tolerance, eps=epsilon, max_it
     # x0 = starting point of facility
     # tol = for convergence, eps = for checking 1 / 0 conditions, max_it = maximum iteration
 
-    x = np.array(x0, dtype=float)
+    # if x0 is not given, the starting point is the weighted center as asked in part 2
+    if x0 is None:
+        wsum = np.sum(weights)
+        if wsum > 0:
+            x = np.average(a_coords, axis=0, weights=weights)
+        else:
+            x = a_coords.mean(axis=0)
+    else:
+        x = np.array(x0, dtype=float)
+
     for _ in range(max_it):
         d = np.linalg.norm(a_coords - x, axis=1) # vector gives the distance values of facility i to customer j's
 
@@ -306,7 +315,7 @@ def weiszfeld(a_coords, weights, x0, tol=weizfeld_tolerance, eps=epsilon, max_it
         den = (weights * invd).sum()
 
         # New location of facility
-        x_new = a_coords.mean(axis=0) if den <= 0 else num / den
+        x_new = x if den <= 0 else num / den
 
         # if the location change is lower than tol, it is enough
         if pure_euclidian_distance(x_new, x) < tol:
@@ -321,7 +330,7 @@ def total_cost(x_fac, assignments, customer_coords, transport_costs):
     # assignments = which customer assigned to which facility. It is a vector
     # This function is intended for calculating the total cost.
     # It spans over customers for each facility.
-    # sum_j C_{i_j, j} * ||x_{i_j} - a_j|| ]
+    # sum_j C_{i_j, j} * ||x_{i_j} - a_j||
 
     total = 0.0
     for j in range(customer_coords.shape[0]):
@@ -359,12 +368,9 @@ def solve_part4(n, m, customer_coords, transport_costs, restarts=1000, max_outer
         for i in range(m):
             idx = np.where(assignments == i)[0] # gives the indexes of customers assigned to ith facility
             if idx.size > 0:
-                # take a random index from assigned customers
-                # and set the location of a facility there to start from a closer area.
-                x_fac[i] = customer_coords[idx[rng.integers(0, idx.size)]] 
+                x_fac[i] = customer_coords[idx[rng.integers(0, idx.size)]]
             else:
-                # if there is no assigned customer to that facility, locate it randomly
-                x_fac[i] = customer_coords[rng.integers(0, n)] 
+                x_fac[i] = customer_coords[rng.integers(0, n)]
 
         prev_obj = float('inf')
         for t in range(1, max_outer + 1):
@@ -377,7 +383,7 @@ def solve_part4(n, m, customer_coords, transport_costs, restarts=1000, max_outer
                     continue
                 a_i = customer_coords[idx]
                 w_i = transport_costs[i, idx]
-                x_fac[i] = weiszfeld(a_i, w_i, x_fac[i])
+                x_fac[i] = weiszfeld(a_i, w_i)
 
             # After weiszfeld algorithm, calculation of total cost
             cur_obj = total_cost(x_fac, assignments, customer_coords, transport_costs)
@@ -386,7 +392,7 @@ def solve_part4(n, m, customer_coords, transport_costs, restarts=1000, max_outer
             new_assignments = assigning_customers(customer_coords, x_fac, transport_costs)
 
             # If there is no improvement and assigned customers are the same
-            if prev_obj - cur_obj <= 1e-8:
+            if prev_obj - cur_obj <= 1e-8 and np.array_equal(new_assignments, assignments):
                 break
 
             assignments = new_assignments
@@ -438,20 +444,20 @@ if __name__ == "__main__":
         # Load all data
         n, m, customer_coords, demand, unit_costs, transport_costs = load_data()
         
-        # Part 1 
-        print("\n=== PART 1: Single Facility (Squared Euclidean) ===")
-        # We chose Facility 1 (index 0)
-        FACILITY_TO_TEST = 0
-        part1_location, part1_cost = solve_part1(FACILITY_TO_TEST, customer_coords, transport_costs)
+        # # Part 1 
+        # print("\n=== PART 1: Single Facility (Squared Euclidean) ===")
+        # # We chose Facility 1 (index 0)
+        # FACILITY_TO_TEST = 0
+        # part1_location, part1_cost = solve_part1(FACILITY_TO_TEST, customer_coords, transport_costs)
     
-        # Part 2 
-        print("\n=== PART 2: Single Facility (Euclidean - Weiszfeld) ===")
-        # Use the result from Part 1 as the initial location
-        solve_part2(FACILITY_TO_TEST, customer_coords, transport_costs, part1_location)
+        # # Part 2 
+        # print("\n=== PART 2: Single Facility (Euclidean - Weiszfeld) ===")
+        # # Use the result from Part 1 as the initial location
+        # solve_part2(FACILITY_TO_TEST, customer_coords, transport_costs, part1_location)
         
-        # Part 3
-        print("\n=== PART 3: Multi-Facility (ALA Heuristic) ===")
-        solve_part3(n, m, customer_coords, transport_costs)
+        # # Part 3
+        # print("\n=== PART 3: Multi-Facility (ALA Heuristic) ===")
+        # solve_part3(n, m, customer_coords, transport_costs)
         
         # Part 4
         print("\n=== PART 4: Multi-Facility (ALA + Weiszfeld, Euclidean) ===")
