@@ -147,6 +147,67 @@ def hooke_jeeves(x0, eps1, a, b, eps2, max_iter=500):
     print(f"f(x*) = {f(x_base):.6f}\n")
     return x_base, f(x_base)
 
+def cyclic_coordinate_search_cycle_based(x0, eps1, a, b, eps2, max_cycles=250):
+ 
+     # this is for converting the starting point to an np array for further processing
+    x = np.array(x0, dtype=float)
+    n = len(x)
+
+    print("--- Solution for Cyclic Coordinate Search ---")
+    header = (
+        f"| {'k':<3} | {'j':<2} | {'x (before)':<22} | {'f(x)':<15} | "
+        f"{'d^(k,j)':<18} | {'alpha^(k,j)':<12} | {'x (after)':<22} |"
+    )
+    print(header)
+    print("-" * len(header))
+
+    k = 0  # it counts the number of full cycles. A cycle for our case means that two steps are taken. 
+    # First one is along e1, second one is along e2
+
+    while k < max_cycles:
+        # starting point
+        x_cycle_start = x.copy()
+
+        # one FULL CYCLE for a coordinate
+        for j in range(n):
+            # these are directions for each cycle (ej terms in the lectures)
+            d = np.zeros(n)
+            d[j] = 1.0
+
+            # this alpha is the best step length along this direction ej from current location x
+            alpha = golden_section_search(x, d, a, b, eps2)
+
+            x_new = x + alpha * d
+
+            # gives rows in the table
+            row = (
+                f"| {k:<3} | {j+1:<2} | "
+                f"[{x[0]:.6f}, {x[1]:.6f}] | "
+                f"{f(x):<15.6f} | "
+                f"[{d[0]:.1f}, {d[1]:.1f}]{'':<8} | "
+                f"{alpha:<12.6f} | "
+                f"[{x_new[0]:.6f}, {x_new[1]:.6f}] |"
+            )
+            print(row)
+
+            x = x_new  # location is updated
+
+        # after a full cycle is completed (steps are taken in both e1 and e2), we need to check the improvement from the previous point as a stopping condition
+        if np.linalg.norm(x - x_cycle_start) < eps1:
+            print(f"Stopping criterion (||x^(k+1) - x^(k)|| < {eps1}) met after cycle {k}.")
+            break
+
+        k += 1
+
+    if k >= max_cycles:
+        print("Max number of cycles is reached.")
+
+    print("-" * len(header))
+    print(f"x* = [{x[0]:.6f}, {x[1]:.6f}]")
+    print(f"f(x*) = {f(x):.6f}\n")
+
+    return x, f(x)
+
 
 def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500, tol=1e-5):
     """
@@ -304,6 +365,18 @@ if __name__ == "__main__":
     LS_b = 100.0
     LS_eps2 = 0.005
     
+    # Parameter Set 1
+    print("="*40 + "\n   PARAMETER SET 1 (Cyclic Coordinate)\n" + "="*40 + "\n")
+    cc_x0_1 = [0.0, 0.0]
+    eps1_set1 = 1e-3  
+    cyclic_coordinate_search_cycle_based(cc_x0_1, eps1_set1, LS_a, LS_b, LS_eps2)
+
+    # Parameter Set 2
+    print("="*40 + "\n   PARAMETER SET 2 (Cyclic Coordinate)\n" + "="*40 + "\n")
+    cc_x0_2 = [5.0, 5.0]
+    eps1_set2 = 1e-5  
+    cyclic_coordinate_search_cycle_based(cc_x0_2, eps1_set2, LS_a, LS_b, LS_eps2)
+
     # --- Parameter Set 1 ---
     print("="*40 + "\n          PARAMETER SET 1 (Hooke-Jeeves)\n" + "="*40 + "\n")
     set1_eps1 = 1e-3

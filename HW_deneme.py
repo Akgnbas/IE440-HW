@@ -1,355 +1,435 @@
-import math
+import numpy as np
 
-#Creating the function and its derivatives 
 def f(x):
-    #f(x) = x^3 * cos(x) * sin(x) + 3x^2 * sin(x) - 3x
-    return x**3 * math.cos(x) * math.sin(x) + 3 * x**2 * math.sin(x) - 3 * x
-
-def f_prime(x):
-    #first derivative f'(x)
-    return (3 * x**2 * math.sin(2*x) / 2) + x**3 * math.cos(2*x) + 6 * x * math.sin(x) + 3 * x**2 * math.cos(x) - 3
-
-def f_double_prime(x):
-    #second derivative f"(x)
-    return (-2*x**3*math.sin(2*x)
-            + 6*x**2*math.cos(2*x)
-            + 3*x*math.sin(2*x)
-            - 3*x**2*math.sin(x)
-            + 12*x*math.cos(x)
-            + 6*math.sin(x))
-
-
-# Intervals for bisection and golden section methods
-common_intervals = [
-    # Set 1: Multi-modal interval. f(x) is not unimodal here. (For test)
-    (1e-4, -10.0, 10.0),
-    # Set 2: Unimodal interval
-    (1e-6, 5.0, 6.0),
-    # Set 3: Unimodal interval
-    (1e-3, -6.0, -5.0),
-]
-
-# The function that calculates the Convergence Ratio (R) and Logarithmic Difference (L):
-def calculate_ratios(current_x, prev_x, prev2_x, order=1):
-    if prev_x is None or prev2_x is None:
-        return "N/A", "N/A"
-
-    abs_diff_k = abs(current_x - prev_x)
-    abs_diff_prev = abs(prev_x - prev2_x)
-
-    if abs_diff_prev == 0:
-        return "N/A", "N/A"
-
-    # Ratio R: |x(k+1) - x(k)| / |x(k) - x(k-1)|^p
-    ratio_R = abs_diff_k / (abs_diff_prev ** order)
-
-    # Logarithmic Difference L: -log|x(k+1) - x(k)| + log|x(k) - x(k-1)|
-    log_diff_L = "N/A"
-    if abs_diff_k > 0 and abs_diff_prev > 0:
-        # L = log(|x(k) - x(k-1)| / |x(k+1) - x(k)|)
-        log_diff_L = math.log10(abs_diff_prev / abs_diff_k)
-
-    return ratio_R, log_diff_L
-
-# Bisection Method
-def bisection_method(obj_func, a_init, b_init, epsilon, run_id):
-    # Title
-    print(f"\n--- Bisection Method Run {run_id} (e={epsilon}, a={a_init}, b={b_init}) ---")
-    a, b = a_init, b_init
-
-    # Check if interval is valid
-    if a >= b:
-        print(f"Error: Invalid interval a={a}, b={b}. Must have a < b.")
-        return
-
-    # Columns: Iteration, a, b, T (x_k), f(T), Ratio R, Log L
-    print(f"{'Iter':<5}{'a':<12}{'b':<12}{'T (x_k)':<12}{'f(T)':<15}{'Ratio R (p=1)':<12}{'Log L':<10}")
-    print("-" * 76)
     
-    x_prev = None
-    x_prev2 = None
-    iteration = 0
-    CONVERGENCE_ORDER = 1  # Convergence order for Bisection is p=1
+    #The objective function to be minimized.
+    #f(x1, x2) = (5*x1 - x2)^4 + (x1 - 2)^2 + x1 - 2*x2 + 12
+    
+    x1 = x[0]
+    x2 = x[1]
+    
+    term1 = (5*x1 - x2)**4
+    term2 = (x1 - 2)**2
+    term3 = x1 - 2*x2 + 12
+    
+    return term1 + term2 + term3
 
-    while abs(b - a) > epsilon:
-        T = (a + b) / 2
-        fT = obj_func(T)
-        delta = (b - a) / 1000  # Small step for numerical slope estimation
-        x_right = T + delta
-        f_right = obj_func(x_right)
+# exact line search
 
-        # If f(x_right) > f(T), the function is increasing, so minimum is likely to the left
-        if f_right > fT:
-            b = T  # Narrow interval to [a, T]
+def golden_section_search(x_start, direction, a, b, eps2):
+    
+    #Performs an exact line search for f(x_start + alpha * direction) in the interval [a, b] until the interval width is < eps2.
+    
+    #Returns the optimal steplength 'alpha'.
+    
+    
+    # Define the 1D function g(alpha)
+    g = lambda alpha: f(x_start + alpha * direction)
+    
+    # Golden ratio conjugate
+    tau = (np.sqrt(5) - 1) / 2
+    
+    # Initialize interior points
+    x1_interval = a + (1 - tau) * (b - a)
+    x2_interval = a + tau * (b - a)
+    
+    f1 = g(x1_interval)
+    f2 = g(x2_interval)
+    
+    while (b - a) > eps2:
+        if f1 < f2:
+            # The minimum is in [a, x2_interval]
+            b = x2_interval
+            x2_interval = x1_interval
+            f2 = f1
+            x1_interval = a + (1 - tau) * (b - a)
+            f1 = g(x1_interval)
         else:
-            a = T  # Narrow interval to [T, b]
+            # The minimum is in [x1_interval, b]
+            a = x1_interval
+            x1_interval = x2_interval
+            f1 = f2
+            x2_interval = a + tau * (b - a)
+            f2 = g(x2_interval)
+            
+    # Return the midpoint of the final interval
+    return (a + b) / 2
 
-        # Calculate convergence ratios
-        ratio_R, log_diff_L = calculate_ratios(T, x_prev, x_prev2, order=CONVERGENCE_ORDER)
+def cyclic_coordinate_search_cycle_based(x0, eps1, a, b, eps2, max_cycles=250):
+    """
+    k counts FULL CYCLES (as in the textbook), and j indicates coordinate index.
 
-        # Print iteration results
-        print(
-            f"{iteration:<5}{a:<12.6f}{b:<12.6f}{T:<12.6f}{fT:<15.6f}"
-            f"{(f'{ratio_R:.6f}' if isinstance(ratio_R, (int, float)) else 'N/A'):<12}"
-            f"{(f'{log_diff_L:.6f}' if isinstance(log_diff_L, (int, float)) else 'N/A'):<10}"
-        )
+    Inputs:
+        x0        : initial point (list or np.array)
+        eps1      : stopping tolerance on ||x^{k+1} - x^{k}|| after a full cycle
+        a, b      : line search interval
+        eps2      : line search tolerance for golden section
+        max_cycles: maximum number of full coordinate cycles
 
-        x_prev2 = x_prev
-        x_prev = T
-        iteration += 1
+    Output:
+        x_star, f(x_star)
+    """
 
-        # Prevent infinite loops
-        if iteration > 1000:
-            print("Warning: Maximum iterations reached.")
+    x = np.array(x0, dtype=float)
+    n = len(x)
+
+    print("--- Solution for Cyclic Coordinate Search ---")
+    header = (
+        f"| {'k':<3} | {'j':<2} | {'x (before)':<22} | {'f(x)':<15} | "
+        f"{'d^(k,j)':<18} | {'alpha^(k,j)':<12} | {'x (after)':<22} |"
+    )
+    print(header)
+    print("-" * len(header))
+
+    k = 0  # it counts the cycle as algorithm progress. A cycle means two steps are taken. 
+    # First one is along e1, second one is along e2
+
+    while k < max_cycles:
+        x_cycle_start = x.copy()
+
+        # One FULL CYCLE over all coordinates j = 1..n
+        for j in range(n):
+            # these are directions for each cycle (ej terms in the lectures)
+            d = np.zeros(n)
+            d[j] = 1.0
+
+            # this alpha is the best step length along this direction ej from current location x
+            alpha = golden_section_search(x, d, a, b, eps2)
+
+            x_new = x + alpha * d
+
+            # gives rows in the table
+            row = (
+                f"| {k:<3} | {j+1:<2} | "
+                f"[{x[0]:.6f}, {x[1]:.6f}] | "
+                f"{f(x):<15.6f} | "
+                f"[{d[0]:.1f}, {d[1]:.1f}]{'':<8} | "
+                f"{alpha:<12.6f} | "
+                f"[{x_new[0]:.6f}, {x_new[1]:.6f}] |"
+            )
+            print(row)
+
+            x = x_new  # location is updated
+
+        # after a full cycle is completed( steps are taken in both e1 and e2), we need to check the improvement from the previous point as a stopping condition
+        if np.linalg.norm(x - x_cycle_start) < eps1:
+            print(f"Stopping criterion (||x^(k+1) - x^(k)|| < {eps1}) met after cycle {k}.")
             break
 
-    final_x = (a + b) / 2
-    final_fx = obj_func(final_x)
+        k += 1
 
-    print("-" * 76)
-    print(f"Solution for Bisection Method:")
-    print(f"x* = {final_x:.8f}")
-    print(f"f(x*) = {final_fx:.8f}")
-    print("========================================================\n")
+    if k >= max_cycles:
+        print("Max number of cycles reached.")
+
+    print("-" * len(header))
+    print(f"x* = [{x[0]:.6f}, {x[1]:.6f}]")
+    print(f"f(x*) = {f(x):.6f}\n")
+
+    return x, f(x)
+
+
+
+
+
+
+# def hooke_jeeves(x0, eps1, a, b, eps2, max_iter=500):
+   
+#     #Performs the Hook & Jeeves Method with exact line search.
     
-    return final_x, final_fx  
+#     #x0: Initial point [x1, x2]
+#     #eps1: Stopping criterion (norm of the pattern move or change in f_value)
+#     #a, b, eps2: Parameters for the exact line search
+   
+#     print("--- Solution for Hook & Jeeves Method ---")
+    
+#     x_base = np.array(x0, dtype=float)
+#     directions = [np.array([1.0, 0.0]), np.array([0.0, 1.0])]
 
-# Tests
-def run_bisection_tests():
-    """Bisection tests: (epsilon, a, b)"""
-    print("========================================================")
-    print("TEST GROUP: BISECTION METHOD")
-    for i, (eps, a, b) in enumerate(common_intervals):
-        bisection_method(f, a, b, eps, i + 1)
+#     # Header for the table 
+#     header = f"| {'k':<3} | {'x^(k)':<20} | {'f(x^(k))':<15} | {'x_temp':<20} | {'d^(k)':<20} | {'alpha^(k)':<10} | {'r^(k+1)':<20} |"
+#     print(header)
+#     print("-" * len(header))
 
-def golden_section_algorithm(a, b, ε, max_iteration=100):
-    # Before the first iteration, we should determine x, y and their values
-    γ = (math.sqrt(5) - 1) / 2
-    x = b - (γ * (b - a))
-    y = a + (γ * (b - a))
-    fx = f(x)
-    fy = f(y)
+#     def exploratory_move(x_start):
+#         #Helper function to perform one cycle of coordinate search
+#         x = x_start.copy()
+#         for d in directions:
+#             # Use Golden Section for line search
+#             alpha = golden_section_search(x, d, a, b, eps2)
+#             x = x + alpha * d
+#         return x
 
-    # Each iteration will create a dictionary in the list, which contains necessary information for outputs
-    results = []
-    results.append({
-        "k": 0,
-        "a": a,
-        'b': b,
-        'x': x,
-        'y': y,
-        'fx': fx,
-        'fy': fy,
-        'ratio': "N/A",
-        'log_ratio': "N/A"
-    })
+#     k = 0
+#     f_prev = f(x_base) # For checking function value change
+    
+#     while k < max_iter:
+#         f_base = f(x_base)
+        
+#         # 1. Exploratory Move from the base point
+#         x_temp = exploratory_move(x_base)
+        
+#         # 2. Pattern Move
+#         d_k = x_temp - x_base
+        
+#         # Check stopping criterion 1: Norm of pattern move
+#         if np.linalg.norm(d_k) < eps1:
+#             print(f"Stopping criterion (d_k norm < {eps1}) met.")
+#             break
+            
+#         # Line search along the pattern direction using Golden Section
+#         alpha_k = golden_section_search(x_temp, d_k, a, b, eps2)
+        
+#         r_k_plus_1 = x_temp + alpha_k * d_k
+#         f_r = f(r_k_plus_1)
+        
+#         # 3. Update Base Point - determine x^(k+1)
+#         if f_r < f_base:
+#             # Pattern move was successful
+#             x_k_plus_1 = r_k_plus_1
+#         else:
+#             # Pattern move failed, restart from x_temp
+#             x_k_plus_1 = x_temp
+            
+#         # Format for table row
+#         row = (
+#             f"| {k:<3} | "
+#             f"[{x_base[0]:.6f}, {x_base[1]:.6f}] | "
+#             f"{f_base:<15.6f} | "
+#             f"[{x_temp[0]:.6f}, {x_temp[1]:.6f}] | "
+#             f"[{d_k[0]:.6f}, {d_k[1]:.6f}] | "
+#             f"{alpha_k:<10.6f} | "
+#             f"[{r_k_plus_1[0]:.6f}, {r_k_plus_1[1]:.6f}] |"  # Print r^(k+1) as requested in PDF
+#         )
+#         print(row)
+        
+#         # Update the base point for the next iteration
+#         x_base = x_k_plus_1
+#         f_new = f(x_base)
+        
+#         # Check stopping criterion 2: Change in function value
+#         if abs(f_new - f_prev) < eps1 and k > 0:
+#              print(f"Stopping criterion (f_change < {eps1}) met.")
+#              break
+#         f_prev = f_new
+            
+#         k += 1
 
-    interval_prev = b - a  # Track previous interval length
-    interval_prev2 = None  # Track second-previous interval length
-    k = 1
+#     if k == max_iter:
+#         print("Max iterations reached.")
+        
+#     # The final solution is the last best base point
+#     print("-" * len(header))
+#     print(f"x* = [{x_base[0]:.6f}, {x_base[1]:.6f}]")
+#     print(f"f(x*) = {f(x_base):.6f}\n")
+#     return x_base, f(x_base)
 
-    # This block is about how the iterations are made
-    while (b - a) >= ε and k < max_iteration:
-        new_a, new_b = a, b
-        if fx < fy:
-            new_b = y
-            y = x
-            fy = fx
-            x = new_b - (γ * (new_b - new_a))
-            fx = f(x)
-        else:
-            new_a = x
-            x = y
-            fx = fy
-            y = new_a + (γ * (new_b - new_a))
-            fy = f(y)
 
-        # Select x_k as the point with the lower function value
-        x_k = x if fx < fy else y
+# def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500, tol=1e-5):
+#     """
+#     Performs the Nelder-Mead Simplex Search
+    
+#     initial_points: A list of n+1 starting points (e.g., [[0,0], [1,0], [0,1]])
+#     alpha, beta, gamma: Reflection, Contraction, Expansion coefficients
+#     tol: Stopping criterion 
+#     shrink operation is now added as well
+#     """
+    
+#     print("--- Solution for Simplex Search ---")
+    
+#     # n = number of dimensions
+#     n = len(initial_points[0])
+    
+#     # Initializing Simplex Search
+#     simplex = []
+#     for pt in initial_points:
+#         pt_array = np.array(pt, dtype=float)
+#         simplex.append((f(pt_array), pt_array))
 
-        # Calculate convergence ratio based on interval length
-        interval_current = new_b - new_a
-        ratio, log_ratio = calculate_ratios(interval_current, interval_prev, interval_prev2, order=1)
+#     # Printing Table Header
+#     header = f"| {'Iter':<5} | {'x_bar':<22} | {'x_h':<22} | {'x_l':<22} | {'x_new':<22} | {'f(x_new)':<12} | {'Type':<4} |"
+    
+#     print(header)
+#     print("-" * len(header))
 
-        # Store results
-        results.append({
-            'k': k,
-            'a': new_a,
-            'b': new_b,
-            'x': x,
-            'y': y,
-            'fx': fx,
-            'fy': fy,
-            'ratio': ratio,
-            'log_ratio': log_ratio
-        })
+#     k = 0
+#     #number of max iterations are decided as 500, may be experimented differently
+#     while k < max_iter:
+        
+#         # Sorting Vertices
+#         simplex.sort(key=lambda x: x[0])
+        
+#         f_b = simplex[0][0]  # Best f(x)
+#         x_b = simplex[0][1]  # Best point (x_l)
+#         f_s = simplex[1][0]  # Second-worst f(x)
+#         x_s = simplex[1][1]  # Second-worst point
+#         f_h = simplex[-1][0] # Worst f(x)
+#         x_h = simplex[-1][1] # Worst point (x_h)
+        
+#         # Stopping Criterion
+#         f_values = [s[0] for s in simplex]
+#         if np.std(f_values) < tol:
+#             print("Stopping criterion (std dev of f_values < tol) met.")
+#             break
+            
+#         # Calculate Centroid (excluding the worst point)
+#         x_c = (x_b + x_s) / n  # This is x_bar
+        
+#         # Store data for the table row
+#         xh_str = f"[{x_h[0]:.6f}, {x_h[1]:.6f}]" # x_h
+#         xb_str = f"[{x_b[0]:.6f}, {x_b[1]:.6f}]" # x_l
+#         xc_str = f"[{x_c[0]:.6f}, {x_c[1]:.6f}]" # x_bar
+        
+        
+#         new_point = None
+#         f_new = None
+#         op_type = ""
 
-        interval_prev2 = interval_prev
-        interval_prev = interval_current
-        a, b = new_a, new_b
-        k = k + 1
+#         # Reflection 
+#         x_r = x_c + alpha * (x_c - x_h)
+#         f_r = f(x_r)
+        
+#         if f_r < f_s:
+#             if f_r < f_b:
+#                 # Expansion
+#                 x_e = x_c + gamma * (x_r - x_c)
+#                 f_e = f(x_e)
+                
+#                 if f_e < f_r:
+#                     new_point = x_e
+#                     f_new = f_e
+#                     op_type = "E"
+#                 else:
+#                     new_point = x_r
+#                     f_new = f_r
+#                     op_type = "R"
+#             else:
+#                 # f_b <= f_r < f_s
+#                 new_point = x_r
+#                 f_new = f_r
+#                 op_type = "R"
+#         else:
+#             # f_r >= f_s
+#             #  Contraction 
+#             if f_r < f_h:
+#                 # Outside Contraction
+#                 x_con = x_c + beta * (x_r - x_c)
+#             else:
+#                 # Inside Contraction
+#                 x_con = x_c - beta * (x_c - x_h)
+                
+#             f_con = f(x_con)
+            
+#             if f_con < min(f_r, f_h):
+#                 # Contraction was successful
+#                 new_point = x_con
+#                 f_new = f_con
+#                 op_type = "C"
+#             else:
+#                 # Contraction failed, perform Shrink
+#                 op_type = "S"
+                
+#                 s1_new = x_b + 0.5 * (x_s - x_b) 
+#                 s2_new = x_b + 0.5 * (x_h - x_b) 
+                
+#                 simplex[1] = (f(s1_new), s1_new)
+#                 simplex[2] = (f(s2_new), s2_new)
+                
+#                 new_point = x_b
+#                 f_new = f_b
+            
+        
+#         # Update Simplex and Print Row
+#         if op_type != "S":
+#             simplex[-1] = (f_new, new_point)
 
-    # Optimal points at the end
-    if fx < fy:
-        x_star = x
-        f_star = fx
-    else:
-        x_star = y
-        f_star = fy
-    return x_star, f_star, results
+#         # Format for table row
+#         x_new_str = f"[{new_point[0]:.6f}, {new_point[1]:.6f}]" # x_new
+        
+#         row = (
+#             f"| {k:<5} | "
+#             f"{xc_str:<22} | "   # x_bar
+#             f"{xh_str:<22} | "   # x_h
+#             f"{xb_str:<22} | "   # x_l
+#             f"{x_new_str:<22} | " # x_new
+#             f"{f_new:<12.6f} | "   # f(x_new)
+#             f"{op_type:<4} |"
+#         )
+        
+#         print(row)
+        
+#         k += 1
 
-# Printing the information related to each iteration
-def showing_results(results, x_star, f_star, a, b, ε):
-    print("\n" + "-"*120)
-    print(f"Golden Section Algorithm - Parameters: a={a}, b={b}, ε={ε}")
-    print("-"*120)
-    print(f"{'Iteration':<10} {'a':<14} {'b':<14} {'x':<14} {'y':<14} {'f(x)':<14} {'f(y)':<14} {'Ratio':<12} {'Log Ratio':<12}")
-    print("-"*120)
+#     if k == max_iter:
+#         print("Max iterations reached.")
+        
+#     # Final Solution
+#     simplex.sort(key=lambda x: x[0])
+#     final_best_f = simplex[0][0]
+#     final_best_x = simplex[0][1]
+    
+#     print("-" * len(header))
+#     print(f"x* = [{final_best_x[0]:.6f}, {final_best_x[1]:.6f}]")
+#     print(f"f(x*) = {final_best_f:.6f}\n")
+#     return final_best_x, final_best_f
 
-    for i in results:
-        if i["ratio"] is not None and isinstance(i["ratio"], (int, float)):
-            ratio_str = f"{i['ratio']:.6f}"
-        else:
-            ratio_str = "---"
 
-        if i['log_ratio'] is not None and isinstance(i["log_ratio"], (int, float)):
-            log_ratio_str = f"{i['log_ratio']:.6f}"
-        else:
-            log_ratio_str = "---"
-
-        print(f"{i['k']:<10} {i['a']:<14.8f} {i['b']:<14.8f} {i['x']:<14.8f} {i['y']:<14.8f} "
-              f"{i['fx']:<14.8f} {i['fy']:<14.8f} {ratio_str:<12} {log_ratio_str:<12}")
-
-    print("-"*120)
-    print(f"x* = {x_star:.10f}")
-    print(f"f(x*) = {f_star:.10f}")
-    print("="*120 + "\n")
-
-# Newton's Method
-def newtons_method_algorithm(obj_func, d1_func, d2_func, x0, tol=1e-8, max_iter=100, run_id=1):
-    # Prints a table as:
-    # Iteration | x^(k) | f(x^(k)) | f'(x^(k)) | f''(x^(k)) | |x^{k+1}-x^{k}| / |x^{k}-x^{k-1}|^2
-    print(f"\nSolution for Newton’s Method Run {run_id}:")
-    print(f"x0 = {x0:.10f}")
-    print(f"{'Iteration':<10}{'x^(k)':<18}{'f(x^(k))':<18}{'f\'(x^(k))':<18}{'f\"(x^(k))':<18}"
-          f"{'|Δx_k|/|Δx_{k-1}|^2':<22}")
-    print("-" * 100)
-    # initialize
-    x_prev2 = None
-    x_prev  = None
-    x       = float(x0)
-    # classical newton step
-    for k in range(max_iter):
-        fx  = obj_func(x)
-        g   = d1_func(x)
-        H   = d2_func(x)
-
-        # A simple safeguard here for near-zero curvature
-        if abs(H) < 1e-14:
-            step = -g * 1e-3
-        else:
-            step = -g / H
-
-        x_new = x + step
-
-        # Convergence ratio with p=2 (quadratic for Newton)
-        R, L = calculate_ratios(x_new, x, x_prev, order=2)
-
-        # Print the row for iteration k
-        print(f"{k:<10}{x:<18.10f}{fx:<18.10f}{g:<18.10f}{H:<18.10f}"
-              f"{(f'{R:.6e}' if isinstance(R,(int,float)) else '---'):<22}")
-
-        # Stop tests: gradient or step small
-        if abs(g) <= tol or abs(x_new - x) <= tol:
-            x_star = x_new
-            f_star = obj_func(x_star)
-            print("-" * 100)
-            print(f"x* = {x_star:.10f}")
-            print(f"f(x*) = {f_star:.10f}")
-            return x_star, f_star
-
-        # updating
-        x_prev2, x_prev, x = x_prev, x, x_new
-
-    # If max iteration hits
-    x_star = x
-    f_star = obj_func(x_star)
-    print("-" * 100)
-    print("Reached max_iter.")
-    print(f"x* = {x_star:.10f}")
-    print(f"f(x*) = {f_star:.10f}")
-    return x_star, f_star
-
-# Secant Method
-def secant_method_algorithm(obj_func, d1_func, x0, x1, tol=1e-8, max_iter=200, run_id=1):
-    # Prints a table as:
-    # Iteration | x^(k) | f(x^(k)) | f'(x^(k)) | |x^{k+1}-x^{k}| / |x^{k}-x^{k-1}|^{φ}
-    PHI = 1.6180339887498948  # golden ratio (order of convergence)
-    print(f"\nSolution for Secant Method Run {run_id}:")
-    print(f"x0 = {x0:.10f}")
-    print(f"x1 = {x1:.10f}")
-    print(f"{'Iteration':<10}{'x^(k)':<18}{'f(x^(k))':<18}{'f\'(x^(k))':<18}"
-          f"{'|Δx_k|/|Δx_{k-1}|^{φ}':<24}")
-    print("-" * 90)
-    # initialize
-    x_prev = float(x0)
-    x      = float(x1)
-    g_prev = d1_func(x_prev)
-    # secant step
-    for k in range(max_iter):
-        fx = obj_func(x)
-        g  = d1_func(x)
-        denom = (g - g_prev)
-        if abs(denom) < 1e-14:
-            dx = -g * 1e-3  # fallback step
-        else:
-            dx = -g * (x - x_prev) / denom
-        x_new = x + dx
-        # Convergence ratio with p = φ
-        R, L = calculate_ratios(x_new, x, x_prev, order=PHI)
-        print(f"{k:<10}{x:<18.10f}{fx:<18.10f}{g:<18.10f}"
-              f"{(f'{R:.6e}' if isinstance(R,(int,float)) else '---'):<24}")
-        if abs(g) <= tol or abs(x_new - x) <= tol:
-            x_star = x_new
-            f_star = obj_func(x_star)
-            print("-" * 90)
-            print(f"x* = {x_star:.10f}")
-            print(f"f(x*) = {f_star:.10f}")
-            return x_star, f_star
-        # updating
-        x_prev, g_prev, x = x, g, x_new
-    # if max iteration hits
-    x_star = x
-    f_star = obj_func(x_star)
-    print("-" * 90)
-    print("Reached max_iter.")
-    print(f"x* = {x_star:.10f}")
-    print(f"f(x*) = {f_star:.10f}")
-    return x_star, f_star
-
-# Modified main execution block to control order
 if __name__ == "__main__":
-    print("--- Execution Started ---")
-    # Bisection tests
-    run_bisection_tests()
-    # Golden Section tests
-    print("*****" + " "*20 + "Common Interval 1" + " "*20 + "*****")
-    x_star, f_star, results = golden_section_algorithm(-10, 10, 1e-4, 100)
-    showing_results(results, x_star, f_star, -10, 10, 1e-4)
-    print("*****" + " "*20 + "Common Interval 2" + " "*20 + "*****")
-    x_star, f_star, results = golden_section_algorithm(5, 6, 1e-6, 100)
-    showing_results(results, x_star, f_star, 5, 6, 1e-6)
-    print("*****" + " "*20 + "Common Interval 3" + " "*20 + "*****")
-    x_star, f_star, results = golden_section_algorithm(-6, -5, 1e-3, 100)
-    showing_results(results, x_star, f_star, -6, -5, 1e-3)
-    # Newton's method tests
-    print("***** Newton's Method Tests *****")
-    newtons_method_algorithm(f, f_prime, f_double_prime, x0=0.0, tol=1e-6, max_iter=100, run_id=1)
-    newtons_method_algorithm(f, f_prime, f_double_prime, x0=5.5, tol=1e-10, max_iter=100, run_id=2)
-    newtons_method_algorithm(f, f_prime, f_double_prime, x0=-5.5, tol=1e-6, max_iter=100, run_id=3)
-    # Secant method tests
-    print("***** Secant Method Tests *****")
-    secant_method_algorithm(f, f_prime, x0=-1.0, x1=1.0, tol=1e-6, max_iter=100, run_id=1)
-    secant_method_algorithm(f, f_prime, x0=5.0, x1=6.0, tol=1e-10, max_iter=100, run_id=2)
-    secant_method_algorithm(f, f_prime, x0=-6.0, x1=-5.0, tol=1e-6, max_iter=100, run_id=3)
-    print("--- Execution Completed ---")
+    
+    # --- Parameters for Line Search (fixed) ---
+    LS_a = -100.0
+    LS_b = 100.0
+    LS_eps2 = 0.005
+
+    # Parameter Set 1
+    print("="*40 + "\n   PARAMETER SET 1 (Cyclic Coordinate)\n" + "="*40 + "\n")
+    cc_x0_1 = [0.0, 0.0]
+    eps1_set1 = 1e-3  # 0.02
+    cyclic_coordinate_search_cycle_based(cc_x0_1, eps1_set1, LS_a, LS_b, LS_eps2)
+
+    # Parameter Set 2
+    print("="*40 + "\n   PARAMETER SET 2 (Cyclic Coordinate)\n" + "="*40 + "\n")
+    cc_x0_2 = [5.0, 5.0]
+    eps1_set2 = 1e-5  # veya 3e-2 de olur
+    cyclic_coordinate_search_cycle_based(cc_x0_2, eps1_set2, LS_a, LS_b, LS_eps2)
+    
+    # # --- Parameter Set 1 ---
+    # print("="*40 + "\n          PARAMETER SET 1 (Hooke-Jeeves)\n" + "="*40 + "\n")
+    # set1_eps1 = 1e-3
+    # set1_x0 = [0.0, 0.0]
+    
+    # hooke_jeeves(set1_x0, set1_eps1, LS_a, LS_b, LS_eps2)
+    # print("\n") # Add spacing
+
+    # # --- Parameter Set 2 ---
+    # print("="*40 + "\n          PARAMETER SET 2 (Hooke-Jeeves)\n" + "="*40 + "\n")
+    # set2_eps1 = 1e-5
+    # set2_x0 = [5.0, 5.0]  # A different starting point
+    
+    # hooke_jeeves(set2_x0, set2_eps1, LS_a, LS_b, LS_eps2)
+
+    # # --- Simplex Coefficients ---
+    # alpha = 1.0
+    # beta = 0.5
+    # gamma = 2.0
+    
+    # # --- Parameter Set 1 (Simplex) ---
+    # print("="*40 + "\n           PARAMETER SET 1 (Simplex)\n" + "="*40 + "\n")
+    # # a simple triangle around the origin
+    # set1_initial_points = [
+    #     [0.0, 0.0],
+    #     [1.0, 0.0],
+    #     [0.0, 1.0]
+    # ]
+    # simplex_search(set1_initial_points, alpha, beta, gamma)
+    # print("\n") 
+    
+    # # --- Parameter Set 2 (Simplex) ---
+    # print("="*40 + "\n           PARAMETER SET 2 (Simplex)\n" + "="*40 + "\n")
+    # # a different triangle, starting further away
+    # set1_initial_points_2 = [
+    #     [5.0, 5.0],
+    #     [6.0, 5.0],
+    #     [5.0, 6.0]
+    # ]
+    # simplex_search(set1_initial_points_2, alpha, beta, gamma)
+    # print("\n") 
