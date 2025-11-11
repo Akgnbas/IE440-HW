@@ -155,7 +155,7 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
     initial_points: A list of n+1 starting points (e.g., [[0,0], [1,0], [0,1]])
     alpha, beta, gamma: Reflection, Contraction, Expansion coefficients
     tol: Stopping criterion 
-    shrink operation is not added, as it was not stated in guidelines nor in lectures
+    shrink operation is added
     """
     
     print("--- Solution for Simplex Search ---")
@@ -240,14 +240,32 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
                 
             f_con = f(x_con)
             
-            new_point = x_con
-            f_new = f_con
-            op_type = "C"
+            if f_con < min(f_r, f_h):
+                # Contraction was successful
+                new_point = x_con
+                f_new = f_con
+                op_type = "C"
+            else:
+                # Contraction failed, perform Shrink
+                op_type = "S"
+                
+                # New points are calculated relative to the best point (x_b)
+                s1_new = x_b + 0.5 * (x_s - x_b) # New second-worst point
+                s2_new = x_b + 0.5 * (x_h - x_b) # New worst point
+                
+                # Update the simplex list (all points except the best)
+                simplex[1] = (f(s1_new), s1_new)
+                simplex[2] = (f(s2_new), s2_new)
+                
+                new_point = x_b
+                f_new = f_b
             
-        
         # Update Simplex and Print Row
-        # Replace the worst point with the new point
-        simplex[-1] = (f_new, new_point)
+        
+        if op_type != "S":
+            # Replace the worst point with the new point
+            # (Shrink operation updates the simplex on its own)
+            simplex[-1] = (f_new, new_point)
 
         # Format for table row
         x_new_str = f"[{new_point[0]:.6f}, {new_point[1]:.6f}]"
@@ -275,7 +293,6 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
     print(f"x* = [{final_best_x[0]:.6f}, {final_best_x[1]:.6f}]")
     print(f"f(x*) = {final_best_f:.6f}\n")
     return final_best_x, final_best_f
-
 
 
 if __name__ == "__main__":
