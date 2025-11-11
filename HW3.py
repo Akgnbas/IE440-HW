@@ -148,6 +148,137 @@ def hooke_jeeves(x0, eps1, a, b, eps2, max_iter=500):
     return x_base, f(x_base)
 
 
+def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500, tol=1e-5):
+    """
+    Performs the Nelder-Mead Simplex Search
+    
+    initial_points: A list of n+1 starting points (e.g., [[0,0], [1,0], [0,1]])
+    alpha, beta, gamma: Reflection, Contraction, Expansion coefficients
+    tol: Stopping criterion (e.g., std dev of function values)
+    """
+    
+    print("--- Solution for Simplex Search ---")
+    
+    # n = number of dimensions (which is 2)
+    n = len(initial_points[0])
+    
+    # --- 1. Initialize Simplex ---
+    simplex = []
+    for pt in initial_points:
+        pt_array = np.array(pt, dtype=float)
+        simplex.append((f(pt_array), pt_array))
+
+    # --- 2. Print Table Header ---
+    header = f"| {'Iter':<5} | {'x_h':<22} | {'X (Simplex Vertices)':<70} | {'x_new':<22} | {'f(x_new)':<12} | {'Type':<4} |"
+    print(header)
+    print("-" * len(header))
+
+    k = 0
+    while k < max_iter:
+        
+        # --- 3. Sort Vertices ---
+        simplex.sort(key=lambda x: x[0])
+        
+        f_b = simplex[0][0]  # Best f(x)
+        x_b = simplex[0][1]  # Best point
+        f_s = simplex[1][0]  # Second-worst f(x)
+        x_s = simplex[1][1]  # Second-worst point
+        f_h = simplex[-1][0] # Worst f(x)
+        x_h = simplex[-1][1] # Worst point
+        
+        # --- 4. Stopping Criterion ---
+        f_values = [s[0] for s in simplex]
+        if np.std(f_values) < tol:
+            print("Stopping criterion (std dev of f_values < tol) met.")
+            break
+            
+        # --- 5. Calculate Centroid (excluding the worst point) ---
+        x_c = (x_b + x_s) / n
+        
+        # Store data for the table row
+        xh_str = f"[{x_h[0]:.6f}, {x_h[1]:.6f}]"
+        X_str = ", ".join([f"[{pt[1][0]:.6f}, {pt[1][1]:.6f}]" for pt in simplex])
+        
+        new_point = None
+        f_new = None
+        op_type = ""
+
+        # --- 6. Reflection ---
+        x_r = x_c + alpha * (x_c - x_h)
+        f_r = f(x_r)
+        
+        if f_r < f_s:
+            if f_r < f_b:
+                # --- 7. Expansion ---
+                x_e = x_c + gamma * (x_r - x_c)
+                f_e = f(x_e)
+                
+                if f_e < f_r:
+                    new_point = x_e
+                    f_new = f_e
+                    op_type = "E"
+                else:
+                    new_point = x_r
+                    f_new = f_r
+                    op_type = "R"
+            else:
+                # f_b <= f_r < f_s
+                new_point = x_r
+                f_new = f_r
+                op_type = "R"
+        else:
+            # f_r >= f_s
+            # --- 8. Contraction ---
+            if f_r < f_h:
+                # Outside Contraction
+                x_con = x_c + beta * (x_r - x_c)
+            else:
+                # Inside Contraction
+                x_con = x_c - beta * (x_c - x_h)
+                
+            f_con = f(x_con)
+            
+            # --- MODIFIED PART ---
+            # We must replace the worst point with the contracted point,
+            # even if f_con is not better than f_h,
+            # because the 'Shrink' operation is not used.
+            new_point = x_con
+            f_new = f_con
+            op_type = "C"
+            # --- END OF MODIFICATION ---
+        
+        # --- 9. Update Simplex and Print Row ---
+        # Replace the worst point with the new point
+        simplex[-1] = (f_new, new_point)
+
+        # Format for table row
+        x_new_str = f"[{new_point[0]:.6f}, {new_point[1]:.6f}]"
+        row = (
+            f"| {k:<5} | "
+            f"{xh_str:<22} | "
+            f"{X_str:<70} | "
+            f"{x_new_str:<22} | "
+            f"{f_new:<12.6f} | "
+            f"{op_type:<4} |"
+        )
+        print(row)
+        
+        k += 1
+
+    if k == max_iter:
+        print("Max iterations reached.")
+        
+    # --- 10. Final Solution ---
+    # The final solution is the best point in the final simplex
+    # Re-sort one last time to be sure
+    simplex.sort(key=lambda x: x[0])
+    final_best_f = simplex[0][0]
+    final_best_x = simplex[0][1]
+    
+    print("-" * len(header))
+    print(f"x* = [{final_best_x[0]:.6f}, {final_best_x[1]:.6f}]")
+    print(f"f(x*) = {final_best_f:.6f}\n")
+    return final_best_x, final_best_f
 
 
 
@@ -172,3 +303,30 @@ if __name__ == "__main__":
     set2_x0 = [5.0, 5.0]  # A different starting point
     
     hooke_jeeves(set2_x0, set2_eps1, LS_a, LS_b, LS_eps2)
+
+    # --- Simplex Coefficients (fixed as per HW) ---
+    alpha = 1.0
+    beta = 0.5
+    gamma = 2.0
+    
+    # --- Parameter Set 1 (Simplex) ---
+    print("="*40 + "\n           PARAMETER SET 1 (Simplex)\n" + "="*40 + "\n")
+    # Initial simplex: a simple triangle around the origin
+    set1_initial_points = [
+        [0.0, 0.0],
+        [1.0, 0.0],
+        [0.0, 1.0]
+    ]
+    simplex_search(set1_initial_points, alpha, beta, gamma)
+    print("\n") # Add spacing
+    
+    # --- Parameter Set 2 (Simplex) ---
+    print("="*40 + "\n           PARAMETER SET 2 (Simplex)\n" + "="*40 + "\n")
+    # Initial simplex: a different triangle, starting further away
+    set1_initial_points_2 = [
+        [5.0, 5.0],
+        [6.0, 5.0],
+        [5.0, 6.0]
+    ]
+    simplex_search(set1_initial_points_2, alpha, beta, gamma)
+    print("\n") # Add spacing
