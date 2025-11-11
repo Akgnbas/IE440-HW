@@ -155,7 +155,7 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
     initial_points: A list of n+1 starting points (e.g., [[0,0], [1,0], [0,1]])
     alpha, beta, gamma: Reflection, Contraction, Expansion coefficients
     tol: Stopping criterion 
-    shrink operation is added
+    shrink operation is now added as well
     """
     
     print("--- Solution for Simplex Search ---")
@@ -170,7 +170,8 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
         simplex.append((f(pt_array), pt_array))
 
     # Printing Table Header
-    header = f"| {'Iter':<5} | {'x_h':<22} | {'X (Simplex Vertices)':<70} | {'x_new':<22} | {'f(x_new)':<12} | {'Type':<4} |"
+    header = f"| {'Iter':<5} | {'x_bar':<22} | {'x_h':<22} | {'x_l':<22} | {'x_new':<22} | {'f(x_new)':<12} | {'Type':<4} |"
+    
     print(header)
     print("-" * len(header))
 
@@ -182,11 +183,11 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
         simplex.sort(key=lambda x: x[0])
         
         f_b = simplex[0][0]  # Best f(x)
-        x_b = simplex[0][1]  # Best point
+        x_b = simplex[0][1]  # Best point (x_l)
         f_s = simplex[1][0]  # Second-worst f(x)
         x_s = simplex[1][1]  # Second-worst point
         f_h = simplex[-1][0] # Worst f(x)
-        x_h = simplex[-1][1] # Worst point
+        x_h = simplex[-1][1] # Worst point (x_h)
         
         # Stopping Criterion
         f_values = [s[0] for s in simplex]
@@ -195,11 +196,13 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
             break
             
         # Calculate Centroid (excluding the worst point)
-        x_c = (x_b + x_s) / n
+        x_c = (x_b + x_s) / n  # This is x_bar
         
         # Store data for the table row
-        xh_str = f"[{x_h[0]:.6f}, {x_h[1]:.6f}]"
-        X_str = ", ".join([f"[{pt[1][0]:.6f}, {pt[1][1]:.6f}]" for pt in simplex])
+        xh_str = f"[{x_h[0]:.6f}, {x_h[1]:.6f}]" # x_h
+        xb_str = f"[{x_b[0]:.6f}, {x_b[1]:.6f}]" # x_l
+        xc_str = f"[{x_c[0]:.6f}, {x_c[1]:.6f}]" # x_bar
+        
         
         new_point = None
         f_new = None
@@ -249,34 +252,33 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
                 # Contraction failed, perform Shrink
                 op_type = "S"
                 
-                # New points are calculated relative to the best point (x_b)
-                s1_new = x_b + 0.5 * (x_s - x_b) # New second-worst point
-                s2_new = x_b + 0.5 * (x_h - x_b) # New worst point
+                s1_new = x_b + 0.5 * (x_s - x_b) 
+                s2_new = x_b + 0.5 * (x_h - x_b) 
                 
-                # Update the simplex list (all points except the best)
                 simplex[1] = (f(s1_new), s1_new)
                 simplex[2] = (f(s2_new), s2_new)
                 
                 new_point = x_b
                 f_new = f_b
             
-        # Update Simplex and Print Row
         
+        # Update Simplex and Print Row
         if op_type != "S":
-            # Replace the worst point with the new point
-            # (Shrink operation updates the simplex on its own)
             simplex[-1] = (f_new, new_point)
 
         # Format for table row
-        x_new_str = f"[{new_point[0]:.6f}, {new_point[1]:.6f}]"
+        x_new_str = f"[{new_point[0]:.6f}, {new_point[1]:.6f}]" # x_new
+        
         row = (
             f"| {k:<5} | "
-            f"{xh_str:<22} | "
-            f"{X_str:<70} | "
-            f"{x_new_str:<22} | "
-            f"{f_new:<12.6f} | "
+            f"{xc_str:<22} | "   # x_bar
+            f"{xh_str:<22} | "   # x_h
+            f"{xb_str:<22} | "   # x_l
+            f"{x_new_str:<22} | " # x_new
+            f"{f_new:<12.6f} | "   # f(x_new)
             f"{op_type:<4} |"
         )
+        
         print(row)
         
         k += 1
