@@ -154,29 +154,31 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
     
     initial_points: A list of n+1 starting points (e.g., [[0,0], [1,0], [0,1]])
     alpha, beta, gamma: Reflection, Contraction, Expansion coefficients
-    tol: Stopping criterion (e.g., std dev of function values)
+    tol: Stopping criterion 
+    shrink operation is not added, as it was not stated in guidelines nor in lectures
     """
     
     print("--- Solution for Simplex Search ---")
     
-    # n = number of dimensions (which is 2)
+    # n = number of dimensions
     n = len(initial_points[0])
     
-    # --- 1. Initialize Simplex ---
+    # Initializing Simplex Search
     simplex = []
     for pt in initial_points:
         pt_array = np.array(pt, dtype=float)
         simplex.append((f(pt_array), pt_array))
 
-    # --- 2. Print Table Header ---
+    # Printing Table Header
     header = f"| {'Iter':<5} | {'x_h':<22} | {'X (Simplex Vertices)':<70} | {'x_new':<22} | {'f(x_new)':<12} | {'Type':<4} |"
     print(header)
     print("-" * len(header))
 
     k = 0
+    #number of max iterations are decided as 500, may be experimented differently
     while k < max_iter:
         
-        # --- 3. Sort Vertices ---
+        # Sorting Vertices
         simplex.sort(key=lambda x: x[0])
         
         f_b = simplex[0][0]  # Best f(x)
@@ -186,13 +188,13 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
         f_h = simplex[-1][0] # Worst f(x)
         x_h = simplex[-1][1] # Worst point
         
-        # --- 4. Stopping Criterion ---
+        # Stopping Criterion
         f_values = [s[0] for s in simplex]
         if np.std(f_values) < tol:
             print("Stopping criterion (std dev of f_values < tol) met.")
             break
             
-        # --- 5. Calculate Centroid (excluding the worst point) ---
+        # Calculate Centroid (excluding the worst point)
         x_c = (x_b + x_s) / n
         
         # Store data for the table row
@@ -203,13 +205,13 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
         f_new = None
         op_type = ""
 
-        # --- 6. Reflection ---
+        # Reflection 
         x_r = x_c + alpha * (x_c - x_h)
         f_r = f(x_r)
         
         if f_r < f_s:
             if f_r < f_b:
-                # --- 7. Expansion ---
+                # Expansion
                 x_e = x_c + gamma * (x_r - x_c)
                 f_e = f(x_e)
                 
@@ -228,7 +230,7 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
                 op_type = "R"
         else:
             # f_r >= f_s
-            # --- 8. Contraction ---
+            #  Contraction 
             if f_r < f_h:
                 # Outside Contraction
                 x_con = x_c + beta * (x_r - x_c)
@@ -238,16 +240,12 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
                 
             f_con = f(x_con)
             
-            # --- MODIFIED PART ---
-            # We must replace the worst point with the contracted point,
-            # even if f_con is not better than f_h,
-            # because the 'Shrink' operation is not used.
             new_point = x_con
             f_new = f_con
             op_type = "C"
-            # --- END OF MODIFICATION ---
+            
         
-        # --- 9. Update Simplex and Print Row ---
+        # Update Simplex and Print Row
         # Replace the worst point with the new point
         simplex[-1] = (f_new, new_point)
 
@@ -268,9 +266,7 @@ def simplex_search(initial_points, alpha=1.0, beta=0.5, gamma=2.0, max_iter=500,
     if k == max_iter:
         print("Max iterations reached.")
         
-    # --- 10. Final Solution ---
-    # The final solution is the best point in the final simplex
-    # Re-sort one last time to be sure
+    # Final Solution
     simplex.sort(key=lambda x: x[0])
     final_best_f = simplex[0][0]
     final_best_x = simplex[0][1]
@@ -304,29 +300,29 @@ if __name__ == "__main__":
     
     hooke_jeeves(set2_x0, set2_eps1, LS_a, LS_b, LS_eps2)
 
-    # --- Simplex Coefficients (fixed as per HW) ---
+    # --- Simplex Coefficients ---
     alpha = 1.0
     beta = 0.5
     gamma = 2.0
     
     # --- Parameter Set 1 (Simplex) ---
     print("="*40 + "\n           PARAMETER SET 1 (Simplex)\n" + "="*40 + "\n")
-    # Initial simplex: a simple triangle around the origin
+    # a simple triangle around the origin
     set1_initial_points = [
         [0.0, 0.0],
         [1.0, 0.0],
         [0.0, 1.0]
     ]
     simplex_search(set1_initial_points, alpha, beta, gamma)
-    print("\n") # Add spacing
+    print("\n") 
     
     # --- Parameter Set 2 (Simplex) ---
     print("="*40 + "\n           PARAMETER SET 2 (Simplex)\n" + "="*40 + "\n")
-    # Initial simplex: a different triangle, starting further away
+    # a different triangle, starting further away
     set1_initial_points_2 = [
         [5.0, 5.0],
         [6.0, 5.0],
         [5.0, 6.0]
     ]
     simplex_search(set1_initial_points_2, alpha, beta, gamma)
-    print("\n") # Add spacing
+    print("\n") 
