@@ -122,7 +122,7 @@ def hooke_jeeves(x0, eps1, a, b, eps2, max_iter=500):
             f"[{x_temp[0]:.6f}, {x_temp[1]:.6f}] | "
             f"[{d_k[0]:.6f}, {d_k[1]:.6f}] | "
             f"{alpha_k:<10.6f} | "
-            f"[{r_k_plus_1[0]:.6f}, {r_k_plus_1[1]:.6f}] |"  # Print r^(k+1) as requested in PDF
+            f"[{r_k_plus_1[0]:.6f}, {r_k_plus_1[1]:.6f}] |"  # Print r^(k+1) 
         )
         print(row)
         
