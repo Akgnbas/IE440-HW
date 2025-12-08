@@ -496,12 +496,12 @@ def solve_q2a(x, x_train, y_train, x_test, y_test, z_train, z_test, mu_x, sigma_
             break
 
     print("\n=== Selected MLP for Question 2(a) – Algorithm given in the lecture ===")
-    print(f"Chosen number of hidden units from homework rule J = {best_J}")
+    print(f"Chosen number of hidden units J = {best_J}")
 
     # ---------- Plot 1: J vs Test MSE (hidden unit selection) ----------
     plt.figure(figsize=(5, 4))
     plt.plot(J_list, test_MSE_list, marker="o")
-    plt.title("Q2(a) – Test MSE vs number of hidden units J (homework algo)")
+    plt.title("Q2(a) – Test MSE vs number of hidden units J")
     plt.xlabel("Number of hidden units J")
     plt.ylabel("Test MSE (E_avg)")
     plt.grid(True)
@@ -526,7 +526,7 @@ def solve_q2a(x, x_train, y_train, x_test, y_test, z_train, z_test, mu_x, sigma_
     plt.subplot(1, 2, 1)
     plt.scatter(x_train, y_train, marker="x", label="Training data", alpha=0.7)
     plt.plot(x_plot, y_plot, label=f"MLP fit (J={best_J})")
-    plt.title("Q2(a) – Training data and MLP regression (homework J)")
+    plt.title("Q2(a) – Training data and MLP regression")
     plt.xlabel("x")
     plt.ylabel("y")
     plt.legend()
@@ -536,7 +536,7 @@ def solve_q2a(x, x_train, y_train, x_test, y_test, z_train, z_test, mu_x, sigma_
     plt.subplot(1, 2, 2)
     plt.scatter(x_test, y_test, marker="o", label="Test data", alpha=0.7)
     plt.plot(x_plot, y_plot, label=f"MLP fit (J={best_J})")
-    plt.title("Q2(a) – Test data and MLP regression (homework J)")
+    plt.title("Q2(a) – Test data and MLP regression")
     plt.xlabel("x")
     plt.ylabel("y")
     plt.legend()
@@ -612,7 +612,7 @@ def extra_global_search_and_plot(
         y_train, y_test
     )
 
-    # Train ve test tahminleri
+    # Train and test guesses
     _, y_hat_train_scaled = forward_mlp(z_train, best_params)
     _, y_hat_test_scaled = forward_mlp(z_test, best_params)
 
@@ -697,7 +697,7 @@ def main():
     # Q1: linear and quadratic regression with scaling (x standardize)
     solve_q1(x, y, x_train, y_train, x_test, y_test, z_train, mu_x, sigma_x)
 
-    # Q2(a): one-hidden-layer MLP regression with homework algorithm
+    # Q2(a): one-hidden-layer MLP regression with algorithm
     hw_J, hw_train_SSE, hw_test_MSE, hw_s2 = solve_q2a(
         x, x_train, y_train, x_test, y_test, z_train, z_test, mu_x, sigma_x
     )
