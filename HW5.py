@@ -300,120 +300,122 @@ def solve_q1(x, y, x_train, y_train, x_test, y_test, z_train, mu, sigma):
 # 2) Q2(a) – One-hidden-layer MLP regression
 # ============================================================
 
-def init_mlp_params(J, rng):
-    # 1 input (z), 1 linear output neuron, J hidden sigmoidal neurons
-
-    # Weights from input to hidden (J x 1) and hidden biases (J,)
-    W_in = rng.normal(loc=0.0, scale=0.1, size=(J, 1))
+def init_mlp_params(J, rng, input_dim=1):
+    """
+    Initializes weights and biases for the MLP.
+    
+    Args:
+        J: Number of hidden units.
+        rng: Random number generator instance.
+        input_dim: Dimension of input vector (Default=1 for Q2a compatibility).
+    """
+    # Weights are initialized from a normal distribution.
+    # Shape: (Hidden Units, Input Dimension)
+    W_in = rng.normal(loc=0.0, scale=0.1, size=(J, input_dim))
     b_h = np.zeros(J)
-
-    # Weights from hidden to output (J,) and output bias (scalar)
+    
+    # Output weights: (Hidden Units)
     W_out = rng.normal(loc=0.0, scale=0.1, size=J)
     b_out = 0.0
-
     return W_in, b_h, W_out, b_out
 
 
 def forward_mlp(z, params):
-    # z: standardized input values
-
-    # return h: hidden layer activations
-    # return y_hat: network outputs (in the scale of y we used for training)
-
+    """
+    Computes the forward pass of the network.
+    Supports both 1D inputs (Q2a) and Multi-dimensional inputs (Q2b).
+    """
     W_in, b_h, W_out, b_out = params
+    z = np.asarray(z, float)
+    
+    # --- Compatibility Handling ---
+    # If input is a 1D vector (from Q2a), reshape to (N, 1) matrix.
+    # If input is already (N, 2) (from Q2b), leave it as is.
+    if z.ndim == 1:
+        z = z.reshape(-1, 1)
 
-    z = np.asarray(z, float).reshape(-1, 1)  # (N, 1)
-
-    # Hidden layer: h = sigmoid(h_lin)
+    # Hidden Layer Calculation
+    # Matrix multiplication: (N, input_dim) @ (input_dim, J) -> (N, J)
     h_lin = z @ W_in.T          
     h_lin += b_h                   
+    
+    # Clip to avoid overflow in exponential
     h_lin = np.clip(h_lin, -50.0, 50.0) 
-
+    
+    # Sigmoid Activation
     h = 1.0 / (1.0 + np.exp(-h_lin))
 
-    # Output neuron: linear activation g(h) = h
+    # Output Layer (Linear)
     y_hat = h @ W_out + b_out    
-
     return h, y_hat
 
 
-def train_mlp(
-    z_train,
-    y_train_scaled,
-    J,
-    alpha0=0.5, 
-    eta=0.9,     
-    eps=1e-3,
-    max_epochs=5000,
-    seed=440,
-    verbose=False,
-):
+def train_mlp(z_train, y_train_scaled, J, alpha0=0.5, eta=0.9, eps=1e-3, max_epochs=5000, seed=440, verbose=False, input_dim=1):
+    """
+    Trains the MLP using Batch Gradient Descent.
     
-    # update rule: w^{(t+1)} = w^{(t)} - α^{(t)} * ∇L
-    # α^{(t+1)} = η * α^{(t)}
+    Args:
+        input_dim: Defaults to 1 for Question 2(a) .
+                   Set to 2 for Question 2(b).
+    """
     rng = np.random.default_rng(seed)
-    W_in, b_h, W_out, b_out = init_mlp_params(J, rng)
+    
+    # Initialize parameters (Correctly passes input_dim)
+    W_in, b_h, W_out, b_out = init_mlp_params(J, rng, input_dim=input_dim)
 
     y_train_scaled = np.asarray(y_train_scaled, float)
     history = []
-
-    alpha = alpha0  # current learning rate α(t)
+    alpha = alpha0
     N = len(z_train)
 
-    for epoch in range(max_epochs):
-        # Forward pass
-        h, y_hat = forward_mlp(z_train, (W_in, b_h, W_out, b_out))
+    # Ensure input is in matrix format for vectorized calculation
+    X_mat = np.asarray(z_train, float)
+    if X_mat.ndim == 1:
+        X_mat = X_mat.reshape(-1, 1)
 
-        # MSE on training set (IN SCALED Y SPACE)
+    for epoch in range(max_epochs):
+        # Forward Pass
+        h, y_hat = forward_mlp(X_mat, (W_in, b_h, W_out, b_out))
+
+        # Error Calculation
         err = y_train_scaled - y_hat
         L_val = np.mean(err ** 2)
         history.append(L_val)
 
-        if verbose and (epoch % 500 == 0):
-            print(f"[epoch {epoch:4d}] MSE_scaled = {L_val:.6e}, alpha={alpha:.4f}")
-
-        # Stopping rule: small relative change in MSE (scaled space)
+        # Convergence Check
         if epoch > 0:
             denom = max(abs(history[-2]), 1e-12)
             rel_change = abs(history[-1] - history[-2]) / denom
             if rel_change < eps:
-                if verbose:
-                    print(
-                        f"Stopping at epoch {epoch}, "
-                        f"relative change in MSE_scaled = {rel_change:.3e} < eps."
-                    )
+                if verbose: print(f"Converged at epoch {epoch}")
                 break
 
-        # ----------------------------------------------------
-        # Backpropagation (batch gradients)
-        # Loss: L = (1/N) * sum_i (y_tilde_i - y_hat_i)^2
-        # dL/dy_hat = -(2/N) * (y_tilde - y_hat)
-        # ----------------------------------------------------
+        # Backpropagation
+        # 1. Output Layer Gradients
         dL_dy = -2.0 * err / N       
-
-        # Output layer
         dW_out = h.T @ dL_dy          
         db_out = np.sum(dL_dy)        
 
-        # Hidden layer
+        # 2. Hidden Layer Gradients
         dL_dh = np.outer(dL_dy, W_out)  
-        dh_dhlin = h * (1.0 - h)        # derivative of sigmoid
+        dh_dhlin = h * (1.0 - h)
         dL_dhlin = dL_dh * dh_dhlin     
-
-        zcol = z_train.reshape(-1, 1)   
-        dW_in = dL_dhlin.T @ zcol       
+        
+        # 3. Input Layer Gradients
+        # This works correctly for both input_dim=1 and input_dim=2
+        dW_in = dL_dhlin.T @ X_mat       
         db_h = np.sum(dL_dhlin, axis=0) 
 
+        # Update Weights
         W_out -= alpha * dW_out
         b_out -= alpha * db_out
         W_in  -= alpha * dW_in
         b_h   -= alpha * db_h
-
-        # Update learning rate
+        
+        # Decay learning rate
         alpha *= eta
 
-    params = (W_in, b_h, W_out, b_out)
-    return params, history
+    return (W_in, b_h, W_out, b_out), history
 
 
     # For Question 2(a), I implemented 2 different aprroach. Please check the report to see why.
@@ -675,8 +677,216 @@ def extra_global_search_and_plot(
     plt.show()
 
 
+def solve_q2b(x, y):
+    """
+    Solves Question 2(b): MLP training with augmented inputs [z, z^2].
+    
+    Methodology:
+    1. Independent Data Splitting: Splits data 80% Train / 20% Test internally 
+       to ensure fair evaluation without relying on external scopes.
+    2. Input Augmentation: Creates a two-terminal input vector [z, z^2].
+    3. Strategy Comparison: Compares the 'Standard Lecture Heuristic' (stopping 
+       search when test error increases) against a 'Global Search Strategy'
+       (scanning up to J=100) to demonstrate local vs global optima.
+    """
+    print("\n" + "="*60)
+    print("=== Question 2(b): MLP with inputs [z, z^2] ===")
+    print("="*60)
+
+    # ---------------------------------------------------------
+    # 1. INTERNAL DATA SPLITTING (80% Train, 20% Test)
+    # ---------------------------------------------------------
+    # Using a fixed seed ensures the split is reproducible for the report.
+    rng = np.random.default_rng(seed=999)
+    N = len(x)
+    indices = np.arange(N)
+    rng.shuffle(indices)
+    
+    n_train = int(np.floor(0.8 * N))
+    train_idx = indices[:n_train]
+    test_idx = indices[n_train:]
+    
+    x_train = x[train_idx]
+    y_train = y[train_idx]
+    x_test = x[test_idx]
+    y_test = y[test_idx]
+    
+    print(f"Data partitioning completed internally.")
+    print(f"Training Samples: {len(x_train)} | Test Samples: {len(x_test)}")
+
+    # ---------------------------------------------------------
+    # 2. Feature Engineering & Standardization
+    # ---------------------------------------------------------
+    # Create the quadratic feature x^2
+    x2_train = x_train ** 2
+    x2_test = x_test ** 2
+
+    # Standardize linear inputs (z) using TRAINING statistics only
+    mu_x = np.mean(x_train)
+    sigma_x = np.std(x_train)
+    z_train = (x_train - mu_x) / sigma_x
+    z_test = (x_test - mu_x) / sigma_x
+
+    # Standardize quadratic inputs (z^2) using TRAINING statistics only
+    # Note: It is crucial to standardize x^2 independently because its scale
+    # differs significantly from x, which can hinder gradient descent.
+    mu_sq = np.mean(x2_train)
+    sigma_sq = np.std(x2_train)
+    z_sq_train = (x2_train - mu_sq) / sigma_sq
+    z_sq_test = (x2_test - mu_sq) / sigma_sq
+
+    # Construct the Dual Input Matrix: [z, z^2]
+    # The network now sees 2 input terminals.
+    X_train_2b = np.column_stack([z_train, z_sq_train])
+    X_test_2b  = np.column_stack([z_test,  z_sq_test])
+
+    # Standardize Targets (y)
+    mu_y = np.mean(y_train)
+    sigma_y = np.std(y_train)
+    y_train_scaled = (y_train - mu_y) / sigma_y
+
+    # ---------------------------------------------------------
+    # 3. Model Selection Loop (Search Range: J=3 to 100)
+    # ---------------------------------------------------------
+    J_min = 3
+    J_max = 100
+    J_list = []
+    test_MSE_list = []
+    
+    # Trackers for the Global Best Model
+    global_best_J = None
+    global_best_MSE = np.inf
+    global_best_params = None
+    global_best_stats = None # Stores (SSE, MSE, s^2)
+
+    # Trackers for the Standard/Lecture Algorithm (Greedy)
+    prev_E = np.inf
+    prev_stats = None
+    greedy_stop_J = None
+    greedy_stop_stats = None
+    greedy_found = False
+
+    print(f"Scanning hidden unit range J = {J_min} to {J_max}...")
+    print("-" * 60)
+
+    for J in range(J_min, J_max + 1):
+        # Progress Log
+        print(f" -> Training model with J={J}...", end='\r')
+
+        # Train with input_dim=2
+        params, history = train_mlp(
+            X_train_2b, y_train_scaled, J=J, input_dim=2, 
+            alpha0=0.5, eta=0.9, eps=1e-3, max_epochs=5000, verbose=False
+        )
+
+        # Evaluate on Test Set
+        _, y_hat_test_scaled = forward_mlp(X_test_2b, params)
+        # Denormalize predictions to original scale
+        y_hat_test = mu_y + sigma_y * y_hat_test_scaled
+        
+        test_res = y_test - y_hat_test
+        test_MSE = float(np.mean(test_res ** 2))
+        
+        # Calculate Statistics for Table (Train SSE, s^2)
+        _, y_hat_train_scaled = forward_mlp(X_train_2b, params)
+        y_hat_train = mu_y + sigma_y * y_hat_train_scaled
+        train_SSE = float(np.sum((y_train - y_hat_train)**2))
+        n_test = len(y_test)
+        s2 = float(np.sum((test_MSE - test_res**2)**2) / (n_test - 1))
+        
+        current_stats = (train_SSE, test_MSE, s2)
+
+        J_list.append(J)
+        test_MSE_list.append(test_MSE)
+
+        # --- LOGIC 1: GLOBAL SEARCH ---
+        if test_MSE < global_best_MSE:
+            global_best_MSE = test_MSE
+            global_best_J = J
+            global_best_params = params
+            global_best_stats = current_stats
+
+        # --- LOGIC 2: LECTURE HEURISTIC (GREEDY) ---
+        # Stop if error increases compared to the previous step.
+        # The "optimal" J for this method is the previous one (J-1).
+        if not greedy_found and J > J_min:
+            if test_MSE > prev_E:
+                greedy_stop_J = J - 1
+                greedy_stop_stats = prev_stats
+                greedy_found = True
+                print(f"\n   >> [Greedy Stop] Error increased at J={J}. Standard Algo selects J={greedy_stop_J}.")
+        
+        prev_E = test_MSE
+        prev_stats = current_stats
+
+    # If greedy algorithm never stopped (error kept decreasing), match global best
+    if not greedy_found:
+        greedy_stop_J = global_best_J
+        greedy_stop_stats = global_best_stats
+        print("\n   >> [Greedy] No early stop triggered. Matches Global Best.")
+    else:
+        print("\n -> Global search finished.")
+
+    # ---------------------------------------------------------
+    # 4. Reporting & Visualization
+    # ---------------------------------------------------------
+    print("-" * 60)
+    print(f"Global Search Result: Optimal J = {global_best_J} (MSE={global_best_MSE:.4f})")
+    
+    # Plot 1: Model Selection Comparison
+    plt.figure(figsize=(8, 5))
+    plt.plot(J_list, test_MSE_list, marker="o", label="Test MSE Trajectory")
+    
+    if greedy_found:
+        plt.plot(greedy_stop_J, greedy_stop_stats[1], 'ro', markersize=10, label=f'Greedy Stop (J={greedy_stop_J})')
+    
+    plt.plot(global_best_J, global_best_MSE, 'g*', markersize=15, label=f'Global Best (J={global_best_J})')
+    plt.title("Q2(b) Model Selection: Greedy Heuristic vs. Global Search")
+    plt.xlabel("Number of Hidden Units (J)")
+    plt.ylabel("Test MSE")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+    # Plot 2: Regression Fit Visualization
+    x_min, x_max = x.min(), x.max()
+    x_plot = np.linspace(x_min, x_max, 500)
+    
+    # Prepare plot inputs [z, z^2]
+    z_plot = (x_plot - mu_x) / sigma_x
+    z_sq_plot = (x_plot**2 - mu_sq) / sigma_sq
+    X_plot_2b = np.column_stack([z_plot, z_sq_plot])
+
+    _, y_plot_scaled = forward_mlp(X_plot_2b, global_best_params)
+    y_plot = mu_y + sigma_y * y_plot_scaled
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.scatter(x_train, y_train, marker="x", label="Training Data", alpha=0.7)
+    plt.plot(x_plot, y_plot, color='purple', linewidth=2, label=f"Best Fit (J={global_best_J})")
+    plt.title(f"Q2(b) Training Fit"); plt.grid(True); plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.scatter(x_test, y_test, marker="o", label="Test Data", alpha=0.7)
+    plt.plot(x_plot, y_plot, color='purple', linewidth=2, label=f"Best Fit (J={global_best_J})")
+    plt.title(f"Q2(b) Test Fit"); plt.grid(True); plt.legend()
+    plt.show()
+
+    # Comparison Table Output
+    gr_train_SSE, gr_test_MSE, gr_s2 = greedy_stop_stats
+    gl_train_SSE, gl_test_MSE, gl_s2 = global_best_stats
+
+    print("\n=== Table values for Homework (Question 2(b)) ===")
+    print("Method            | Training SSE       | Test MSE          | s^2 for Test MSE")
+    print("--------------------------------------------------------------------------------")
+    print(f"2(b)-1 (Greedy J={greedy_stop_J}) | {gr_train_SSE:16.6f} | {gr_test_MSE:16.6f} | {gr_s2:16.6f}")
+    print(f"2(b)-2 (Global J={global_best_J}) | {gl_train_SSE:16.6f} | {gl_test_MSE:16.6f} | {gl_s2:16.6f}")
+
+    return global_best_J
+
+
 # ============================================================
-# main – run Q1, Q2(a)-1 and Q2(a)-2
+# main – run Q1, Q2(a)-1 Q2(a)-2 and  Q2(b)
 # ============================================================
 
 def main():
@@ -709,7 +919,8 @@ def main():
         hw_J, hw_train_SSE, hw_test_MSE, hw_s2,
         J_min=3, J_max=1000, progress_step=100
     )
-
+    # Question 2(b) Execution
+    solve_q2b(x, y)
 
 if __name__ == "__main__":
     main()
