@@ -682,8 +682,7 @@ def solve_q2b(x, y):
     Solves Question 2(b): MLP training with augmented inputs [z, z^2].
     
     Methodology:
-    1. Independent Data Splitting: Splits data 80% Train / 20% Test internally 
-       to ensure fair evaluation without relying on external scopes.
+    1. Data Splitting: Splits data 80% Train / 20% Test.
     2. Input Augmentation: Creates a two-terminal input vector [z, z^2].
     3. Strategy Comparison: Compares the 'Standard Lecture Heuristic' (stopping 
        search when test error increases) against a 'Global Search Strategy'
